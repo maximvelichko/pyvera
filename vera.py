@@ -17,10 +17,10 @@ class VeraController(object):
 	temperature_units = 'C'
 
 	def __init__(self, baseUrl):
-		self.BASE_URL = baseUrl	
+		self.BASE_URL = baseUrl
 		self.devices = []
 
-	def get_simple_devices_info(self): 
+	def get_simple_devices_info(self):
 
 		simpleRequestUrl = self.BASE_URL + "/data_request?id=sdata"
 		j = requests.get(simpleRequestUrl).json()
@@ -42,13 +42,13 @@ class VeraController(object):
 			self.device_id_map[dev.get('id')] = dev
 
 	#get list of connected devices, the categoryFilter param can be either a string or array of strings
-	def get_devices(self, categoryFilter=''):	
+	def get_devices(self, categoryFilter=''):
 
 		# the Vera rest API is a bit rough so we need to make 2 calls to get all the info e need
 		self.get_simple_devices_info()
 
 		arequestUrl = self.BASE_URL + "/data_request?id=status&output_format=json"
-		j = requests.get(arequestUrl).json()		
+		j = requests.get(arequestUrl).json()
 
 		self.devices = []
 		items = j.get('devices')
@@ -56,6 +56,8 @@ class VeraController(object):
 		for item in items:
 			item['deviceInfo'] = self.device_id_map.get(item.get('id'))
 			if item.get('deviceInfo') and item.get('deviceInfo').get('categoryName') == 'Switch':
+				self.devices.append(VeraSwitch(item, self))
+			elif item.get('deviceInfo') and item.get('deviceInfo').get('categoryName') == 'On/Off Switch':
 				self.devices.append(VeraSwitch(item, self))
 			elif item.get('deviceInfo') and item.get('deviceInfo').get('categoryName') == 'Temperature Sensor':
 				self.devices.append(VeraSensor(item, self))
@@ -65,7 +67,7 @@ class VeraController(object):
 				if sensor.is_armable:
 					armable = VeraArmableDevice(item, self)
 					armable.category = 'Armable Sensor'
-					self.devices.append(armable)				
+					self.devices.append(armable)
 			elif item.get('deviceInfo') and item.get('deviceInfo').get('categoryName') == 'Light Sensor':
 				self.devices.append(VeraSensor(item, self))
 			else:
@@ -79,7 +81,7 @@ class VeraController(object):
 				filterCategories.append(categoryFilter)
 			else:
 				filterCategories = categoryFilter
-			
+
 			devices = []
 			for item in self.devices:
 				if item.category in filterCategories:
@@ -88,7 +90,7 @@ class VeraController(object):
 
 
 
-class VeraDevice(object):	
+class VeraDevice(object):
 
 	def __init__(self, aJSonObj, veraController):
 		self.jsonState = aJSonObj
@@ -97,7 +99,7 @@ class VeraDevice(object):
 		self.name = ''
 		if self.jsonState.get('deviceInfo'):
 			self.category = self.jsonState.get('deviceInfo').get('categoryName')
-			self.name = self.jsonState.get('deviceInfo').get('name')			
+			self.name = self.jsonState.get('deviceInfo').get('name')
 		else:
 			self.category = ''
 
