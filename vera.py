@@ -19,6 +19,11 @@ class VeraController(object):
 	def __init__(self, baseUrl):
 		self.BASE_URL = baseUrl
 		self.devices = []
+		self.temperature_units = 'C'
+		self.version = None
+		self.model = None
+		self.serial_number = None
+		self.device_services_map = None
 
 	def get_simple_devices_info(self):
 
@@ -88,6 +93,72 @@ class VeraController(object):
 					devices.append(item)
 			return devices
 
+	def refresh_data(self):
+		simpleRequestUrl = self.BASE_URL + "/data_request?id=sdata"
+		j = requests.get(simpleRequestUrl).json()
+
+		self.temperature_units = j.get('temperature', 'C')
+		self.model = j.get('model')
+		self.version = j.get('version')
+		self.serial_number = j.get('serial_number')
+
+		categories = {}
+		cats = j.get('categories')
+
+		for cat in cats:
+			categories[cat.get('id')] = cat.get('name')
+
+		device_id_map = {}
+
+		devs = j.get('devices')
+		for dev in devs:
+			dev['categoryName'] = categories.get(dev.get('category'))
+			device_id_map[dev.get('id')] = dev
+
+		return device_id_map
+
+	def map_services(self):
+
+		# the Vera rest API is a bit rough so we need to make 2 calls to get all the info e need
+		self.get_simple_devices_info()
+
+		arequestUrl = self.BASE_URL + "/data_request?id=status&output_format=json"
+		j = requests.get(arequestUrl).json()
+
+		service_map = {}
+
+		items = j.get('devices')
+
+		for item in items:
+			service_map[item.get('id')] = item.get('states')
+
+		self.device_services_map = service_map
+
+	def set_value(self, device_id, name, value):
+		if self.device_services_map is None:
+			self.map_services()
+
+		if device_id not in self.device_services_map.keys():
+			return
+
+		states = self.device_services_map.get(device_id)
+
+		for item in states:
+			if item.get('variable') == name:
+				serviceName = item.get('service')
+
+				# The Vera API is very inconsistent so we can't be very generic here unfortunately
+				if name == 'LoadLevelTarget':
+					# note the incredibly lame change to the last payload parameter
+					payload = {'id': 'lu_action', 'output_format': 'json', 'DeviceNum': device_id, 'serviceId': serviceName, 'action': 'Set' + name, 'newLoadlevelTarget': value}
+				else:
+					payload = {'id': 'lu_action', 'output_format': 'json', 'DeviceNum': device_id, 'serviceId': serviceName, 'action': 'Set' + name, 'new' + name + 'Value': value}
+
+				requestUrl = self.BASE_URL + "/data_request"
+				r = requests.get(requestUrl, params=payload)
+
+				break
+				item['value'] = value
 
 
 class VeraDevice(object):
