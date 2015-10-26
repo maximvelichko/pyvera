@@ -64,6 +64,9 @@ class VeraController(object):
                 self.devices.append(VeraSwitch(item, self))
             elif item.get('deviceInfo') and item.get('deviceInfo').get('categoryName') == 'On/Off Switch':
                 self.devices.append(VeraSwitch(item, self))
+            elif item.get('deviceInfo') and item.get('deviceInfo').get('categoryName') == 'Dimmable Switch':
+                import pdb; pdb.set_trace()
+                self.devices.append(VeraSwitch(item, self))
             elif item.get('deviceInfo') and item.get('deviceInfo').get('categoryName') == 'Temperature Sensor':
                 self.devices.append(VeraSensor(item, self))
             elif item.get('deviceInfo') and item.get('deviceInfo').get('categoryName') == 'Sensor':
