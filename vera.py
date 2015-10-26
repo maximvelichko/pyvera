@@ -65,8 +65,7 @@ class VeraController(object):
             elif item.get('deviceInfo') and item.get('deviceInfo').get('categoryName') == 'On/Off Switch':
                 self.devices.append(VeraSwitch(item, self))
             elif item.get('deviceInfo') and item.get('deviceInfo').get('categoryName') == 'Dimmable Switch':
-                import pdb; pdb.set_trace()
-                self.devices.append(VeraSwitch(item, self))
+                self.devices.append(VeraDimmer(item, self))
             elif item.get('deviceInfo') and item.get('deviceInfo').get('categoryName') == 'Temperature Sensor':
                 self.devices.append(VeraSensor(item, self))
             elif item.get('deviceInfo') and item.get('deviceInfo').get('categoryName') == 'Sensor':
@@ -218,6 +217,10 @@ class VeraDevice(object):
             return False
 
     @property
+    def is_dimmable(self):
+        return self.category == "Dimmable Switch"
+
+    @property
     def is_trippable(self):
         if self.get_value('Tripped') is not None:
             return True
@@ -258,6 +261,44 @@ class VeraSwitch(VeraDevice):
             return True
         else:
             return False
+
+class VeraDimmer(VeraSwitch):
+
+    def switch_on(self):
+        self.set_value('Target', 1)
+
+    def switch_off(self):
+        self.set_value('Target', 0)
+
+    def is_switched_on(self):
+        self.refresh_value('Status')
+        val = self.get_value('Status')
+        if val == '1':
+            return True
+        else:
+            return False
+
+    def get_brightness(self):
+        """ Converts the Vera level property for dimmable lights from a
+        percentage to the 0 - 255 scale used by HA """
+        percent = int(self.refresh_value('LoadLevelStatus'))
+        print('GetBrightness')
+        print(percent)
+        brightness = 0
+        if percent > 0:
+            brightness = round(percent * 2.55)
+        return int(brightness)
+
+    def set_brightness(self, brightness):
+        """ Converts the Vera level property for dimmable lights from a
+        percentage to the 0 - 255 scale used by HA """
+        percent = 0
+        if brightness > 0:
+            percent = round(brightness / 2.55)
+        print('SetBrightness')
+        print(percent)
+        self.set_value('LoadLevelTarget', percent)
+
 
 class VeraArmableDevice(VeraSwitch):
 
