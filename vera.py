@@ -187,7 +187,12 @@ class VeraDevice(object):
         for item in self.jsonState.get('states'):
             if item.get('variable') == name:
                 serviceName = item.get('service')
-                payload = {'id': 'lu_action', 'output_format': 'json', 'DeviceNum': self.deviceId, 'serviceId': serviceName, 'action': 'Set' + name, 'new' + name + 'Value': value}
+                # The Vera API is very inconsistent so we can't be very generic here unfortunately
+                if name == 'LoadLevelTarget':
+                    # note the incredibly lame change to the last payload parameter
+                    payload = {'id': 'lu_action', 'output_format': 'json', 'DeviceNum': self.deviceId, 'serviceId': serviceName, 'action': 'Set' + name, 'newLoadlevelTarget': value}
+                else:
+                    payload = {'id': 'lu_action', 'output_format': 'json', 'DeviceNum': self.deviceId, 'serviceId': serviceName, 'action': 'Set' + name, 'new' + name + 'Value': value}
                 requestUrl = self.veraController.BASE_URL + "/data_request"
                 r = requests.get(requestUrl, params=payload)
                 item['value'] = value
@@ -264,30 +269,30 @@ class VeraSwitch(VeraDevice):
 
 class VeraDimmer(VeraSwitch):
 
+    def __init__(self, aJSonObj, veraController):
+        super().__init__(aJSonObj, veraController)
+        self.brightness = None
+
     def switch_on(self):
-        self.set_value('Target', 1)
+        self.set_brightness(self.brightness or 254)
 
     def switch_off(self):
+        self.brightness = 0
         self.set_value('Target', 0)
 
     def is_switched_on(self):
-        self.refresh_value('Status')
-        val = self.get_value('Status')
-        if val == '1':
-            return True
-        else:
-            return False
+        return self.get_brightness(True) > 0
 
-    def get_brightness(self):
+    def get_brightness(self, refresh=False):
         """ Converts the Vera level property for dimmable lights from a
         percentage to the 0 - 255 scale used by HA """
+        if self.brightness != None and not refresh:
+            return self.brightness
         percent = int(self.refresh_value('LoadLevelStatus'))
-        print('GetBrightness')
-        print(percent)
-        brightness = 0
+        self.brightness = 0
         if percent > 0:
-            brightness = round(percent * 2.55)
-        return int(brightness)
+            self.brightness = round(percent * 2.55)
+        return int(self.brightness)
 
     def set_brightness(self, brightness):
         """ Converts the Vera level property for dimmable lights from a
@@ -295,8 +300,7 @@ class VeraDimmer(VeraSwitch):
         percent = 0
         if brightness > 0:
             percent = round(brightness / 2.55)
-        print('SetBrightness')
-        print(percent)
+        self.brightness = brightness
         self.set_value('LoadLevelTarget', percent)
 
 
