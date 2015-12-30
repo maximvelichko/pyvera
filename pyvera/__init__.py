@@ -5,12 +5,25 @@ import time
 
 import requests
 
+from .subscribe import SubscriptionRegistry
+
 """
 Vera Controller Python API
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This lib is designed to simplify communication with Vera Z-Wave controllers
 """
+
+_VERA_CONTROLLER = None
+
+def init_controller(url):
+    global _VERA_CONTROLLER
+    created = False
+    if _VERA_CONTROLLER is None:
+        _VERA_CONTROLLER = VeraController(url)
+        created = True
+        _VERA_CONTROLLER.start()
+    return [_VERA_CONTROLLER, created]
 
 class VeraController(object):
 
@@ -24,6 +37,7 @@ class VeraController(object):
         self.model = None
         self.serial_number = None
         self.device_services_map = None
+        self.subscription_registry = SubscriptionRegistry()
 
     def get_simple_devices_info(self):
 
@@ -162,6 +176,18 @@ class VeraController(object):
                 break
                 item['value'] = value
 
+
+    def start(self):
+        self.subscription_registry.start()
+
+    def stop(self):
+        self.subscription_registry.stop()
+
+    def register(self, device):
+        self.subscription_registry.register(device)
+
+    def on(self, *params):
+        self.subscription_registry.on(*params)
 
 class VeraDevice(object):
 
