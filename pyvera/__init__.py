@@ -1,9 +1,11 @@
-__author__ = 'jamespcole'
-
 import json
 import time
 
 import requests
+
+from .subscribe import SubscriptionRegistry
+
+__author__ = 'jamespcole'
 
 """
 Vera Controller Python API
@@ -11,6 +13,25 @@ Vera Controller Python API
 
 This lib is designed to simplify communication with Vera Z-Wave controllers
 """
+
+SUBSCRIPTION_WAIT = 60
+# Min time to wait for event in miliseconds
+SUBSCRIPTION_MIN_WAIT = 200
+
+
+_VERA_CONTROLLER = None
+
+def init_controller(url):
+    global _VERA_CONTROLLER
+    created = False
+    if _VERA_CONTROLLER is None:
+        _VERA_CONTROLLER = VeraController(url)
+        created = True
+        _VERA_CONTROLLER.start()
+    return [_VERA_CONTROLLER, created]
+
+def get_controller():
+    return _VERA_CONTROLLER
 
 class VeraController(object):
 
@@ -24,6 +45,7 @@ class VeraController(object):
         self.model = None
         self.serial_number = None
         self.device_services_map = None
+        self.subscription_registry = SubscriptionRegistry()
 
     def get_simple_devices_info(self):
 
@@ -162,6 +184,55 @@ class VeraController(object):
                 break
                 item['value'] = value
 
+    def get_initial_timestamp(self):
+        simpleRequestUrl = self.BASE_URL + "/data_request?id=lu_sdata"
+        j = requests.get(simpleRequestUrl).json()
+        timestamp = {
+            'loadtime': j.get('loadtime'),
+            'dataversion': j.get('dataversion')
+        }
+        return timestamp
+
+    def get_changed_devices(self, timestamp):
+        simpleRequestUrl = self.BASE_URL + "/data_request?id=lu_sdata"
+        payload = {
+            'timeout': SUBSCRIPTION_WAIT,
+            'minimumdelay': SUBSCRIPTION_MIN_WAIT
+        }
+        payload.update(timestamp)
+        j = requests.get(simpleRequestUrl, params=payload).json()
+        device_ids = [dev['id'] for dev in j.get('devices')]
+        timestamp = {
+            'loadtime': j.get('loadtime'),
+            'dataversion': j.get('dataversion')
+        }
+        return [device_ids, timestamp]
+
+        self.categories = {}
+        cats = j.get('categories')
+
+        for cat in cats:
+            self.categories[cat.get('id')] = cat.get('name')
+
+        self.device_id_map = {}
+
+        devs = j.get('devices')
+        for dev in devs:
+            dev['categoryName'] = self.categories.get(dev.get('category'))
+            self.device_id_map[dev.get('id')] = dev
+
+
+    def start(self):
+        self.subscription_registry.start()
+
+    def stop(self):
+        self.subscription_registry.stop()
+
+    def register(self, device):
+        self.subscription_registry.register(device)
+
+    def on(self, *params):
+        self.subscription_registry.on(*params)
 
 class VeraDevice(object):
 
