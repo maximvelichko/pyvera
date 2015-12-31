@@ -11,6 +11,7 @@ SUBSCRIPTION_RETRY = 60
 
 LOG = logging.getLogger(__name__)
 
+
 class SubscriptionRegistry(object):
     """Class for subscribing to wemo events."""
 
@@ -64,12 +65,13 @@ class SubscriptionRegistry(object):
         timestamp = controller.get_initial_timestamp()
         while not self._exiting:
             try:
-                device_ids, timestamp = controller.get_changed_devices(timestamp)
+                device_ids, timestamp = (
+                    controller.get_changed_devices(timestamp))
                 devices = [self._devices.get(int(id)) for id in device_ids]
                 self._event(devices)
             except requests.RequestException:
-                LOG.info("Could not contact Vera - will retry in %ss", SUBSCRIPTION_RETRY)
+                LOG.info("Could not contact Vera - will retry in %ss",
+                         SUBSCRIPTION_RETRY)
                 time.sleep(SUBSCRIPTION_RETRY)
 
         LOG.info("Shutdown Vera Poll Thread")
-
