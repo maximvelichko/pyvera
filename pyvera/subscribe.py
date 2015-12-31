@@ -33,16 +33,11 @@ class SubscriptionRegistry(object):
         self._devices[device.vera_device_id] = device
 
     def _event(self, devices):
-        LOG.info("Got vera event for devices %s", [d.name for d in devices])
-        # if not devices specified - callback everything
-        if devices:
-            for device in devices:
-                for callback in self._callbacks.get(device, ()):
-                    callback(device)
-        else:
-            for device, callbacks in self._callbacks.items():
-                for callback in callbacks:
-                    callback(device)
+        if devices is None:
+            return
+        for device in devices:
+            for callback in self._callbacks.get(device, ()):
+                callback(device)
 
     def join(self):
         self._poll_thread.join()
@@ -62,11 +57,17 @@ class SubscriptionRegistry(object):
     def _run_poll_server(self):
         from pyvera import get_controller
         controller = get_controller()
-        timestamp = controller.get_initial_timestamp()
+        timestamp = None
+        # Wait for code to initialize to avoid callbacks before ready
+        # Initial state callbacks are instant!
+        time.sleep(10)
         while not self._exiting:
             try:
                 device_ids, timestamp = (
                     controller.get_changed_devices(timestamp))
+                if device_ids is None:
+                    LOG.info("No changes in poll interval")
+                    continue;
                 devices = [self._devices.get(int(id)) for id in device_ids]
                 self._event(devices)
             except requests.RequestException:
