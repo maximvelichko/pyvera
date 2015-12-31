@@ -1,4 +1,4 @@
-# pythonhome-vera
+# python-vera
 A simple Python library to control devices via the Vera controller.
 
 Based on https://github.com/jamespcole/home-assistant-vera-api
@@ -14,7 +14,7 @@ How to use
     >>> controller = pyvera.VeraController("http://192.168.1.161:3480/")
     >>> devices = controller.get_devices('On/Off Switch')
     >>> devices
-    [<pyvera.VeraSwitch object at 0x105ea8dd8>, <pyvera.VeraSwitch object at 0x105ea8c18>, <pyvera.VeraSwitch object at 0x105ea8b00>, <pyvera.VeraSwitch object at 0x105ea8c50>, <pyvera.VeraSwitch object at 0x105ea87b8>, <pyvera.VeraSwitch object at 0x105ea85f8>, <pyvera.VeraSwitch object at 0x105ea8ac8>, <pyvera.VeraSwitch object at 0x105ea86a0>, <pyvera.VeraSwitch object at 0x105ea86d8>, <pyvera.VeraSwitch object at 0x105f754a8>, <pyvera.VeraSwitch object at 0x105f753c8>, <pyvera.VeraSwitch object at 0x105f75400>, <pyvera.VeraSwitch object at 0x105f754e0>, <pyvera.VeraSwitch object at 0x105f75630>, <pyvera.VeraSwitch object at 0x105f915f8>]
+    [<pyvera.VeraSwitch object at 0x105ea8dd8>, <pyvera.VeraSwitch object at 0x105ea8c18>]
 
     >>> devices[0]
     <pyvera.VeraSwitch object at 0x105ea8dd8>
