@@ -1,4 +1,4 @@
-# python-vera
+# pyvera
 A simple Python library to control devices via the Vera controller.
 
 Based on https://github.com/jamespcole/home-assistant-vera-api
@@ -33,4 +33,4 @@ How to use
 
 License
 -------
-The code in pywemo/ouimeaux_device is written by James Cole
+The code in pywemo/ouimeaux_device is written and copyright by James Cole and released under the BSD license. The rest is released under the MIT license.
