@@ -86,8 +86,8 @@ class VeraController(object):
         for item in items:
             item['deviceInfo'] = self.device_id_map.get(item.get('id'))
             if (item.get('deviceInfo') and
-               item.get('deviceInfo').get('categoryName') ==
-               'Switch'):
+                    item.get('deviceInfo').get('categoryName') ==
+                    'Switch'):
                 self.devices.append(VeraSwitch(item, self))
             elif (item.get('deviceInfo') and
                   item.get('deviceInfo').get('categoryName') ==
