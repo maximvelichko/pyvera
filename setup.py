@@ -1,11 +1,12 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
-setup(name='python-vera',
-      version='0.1.1',
+setup(name='pyvera',
+      version='0.2.0',
       description='Python API for talking to Vera Z-Wave controllers',
-      url='https://github.com/jamespcole/home-assistant-vera-api',
-      author='James Cole',
-      license='GPLv2',
+      url='https://github.com/pavoni/pyvera',
+      author='James Cole, Greg Dowling',
+      author_email='mail@gregdowling.com',
+      license='MIT',
       install_requires=['requests>=2.0'],
-      packages=['pyvera'],
+      packages=find_packages(),
       zip_safe=True)
