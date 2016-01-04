@@ -381,7 +381,7 @@ class VeraDimmer(VeraSwitch):
 
     def switch_off(self):
         self.brightness = 0
-        self.set_value('Target', 0)
+        self.set_brightness(self.brightness)
 
     def is_switched_on(self):
         return self.get_brightness(True) > 0
