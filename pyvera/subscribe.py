@@ -65,6 +65,8 @@ class SubscriptionRegistry(object):
             try:
                 device_ids, timestamp = (
                     controller.get_changed_devices(timestamp))
+                if self._exiting:
+                    continue;
                 if device_ids is None:
                     LOG.info("No changes in poll interval")
                     continue;
