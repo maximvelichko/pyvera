@@ -236,11 +236,8 @@ class VeraController(object):
     def stop(self):
         self.subscription_registry.stop()
 
-    def register(self, device):
-        self.subscription_registry.register(device)
-
-    def on(self, *params):
-        self.subscription_registry.on(*params)
+    def register(self, device, callback):
+        self.subscription_registry.register(device, callback)
 
 
 class VeraDevice(object):
