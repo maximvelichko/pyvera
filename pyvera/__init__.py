@@ -10,7 +10,7 @@ Vera Controller Python API
 
 This lib is designed to simplify communication with Vera controllers
 """
-# Time to block on Vera poll if there are no changes
+# Time to block on Vera poll if there are no changes in seconds
 SUBSCRIPTION_WAIT = 30
 # Min time to wait for event in miliseconds
 SUBSCRIPTION_MIN_WAIT = 200
@@ -223,15 +223,12 @@ class VeraController(object):
             }
             payload.update(timestamp)
         result = requests.get(simpleRequestUrl, params=payload).json()
-        if result.get('devices') is None:
-            device_ids = None
-        else:
-            device_ids = [dev['id'] for dev in result.get('devices')]
+        device_data = result.get('devices')
         timestamp = {
             'loadtime': result.get('loadtime'),
             'dataversion': result.get('dataversion')
         }
-        return [device_ids, timestamp]
+        return [device_data, timestamp]
 
     def start(self):
         self.subscription_registry.start()
@@ -267,6 +264,7 @@ class VeraDevice(object):
                 self.name = 'Vera Device ' + str(self.deviceId)
 
     def set_value(self, name, value):
+        print("VERA SET", self)
         for item in self.jsonState.get('states'):
             if item.get('variable') == name:
                 serviceName = item.get('service')
@@ -316,6 +314,13 @@ class VeraDevice(object):
                 return item.get('value')
         return None
 
+
+    def update(self, params):
+        for key in params:
+             for item in self.jsonState.get('states'):
+                if item.get('variable').lower() == key.lower():
+                    item['value'] = params[key]
+
     @property
     def is_armable(self):
         if self.get_value('Armed') is not None:
@@ -361,8 +366,9 @@ class VeraSwitch(VeraDevice):
     def switch_off(self):
         self.set_value('Target', 0)
 
-    def is_switched_on(self):
-        self.refresh_value('Status')
+    def is_switched_on(self, refresh=False):
+        if refresh:
+            self.refresh_value('Status')
         val = self.get_value('Status')
         if val == '1':
             return True
@@ -383,8 +389,8 @@ class VeraDimmer(VeraSwitch):
         self.brightness = 0
         self.set_brightness(self.brightness)
 
-    def is_switched_on(self):
-        return self.get_brightness(True) > 0
+    def is_switched_on(self, refresh=False):
+        return self.get_brightness(refresh) > 0
 
     def get_brightness(self, refresh=False):
         """ Converts the Vera level property for dimmable lights from a
