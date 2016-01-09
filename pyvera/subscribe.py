@@ -9,6 +9,18 @@ import requests
 SUBSCRIPTION_RETRY = 60
 # Time to wait for event in seconds
 
+# Vera stae codes see http://wiki.micasaverde.com/index.php/Luup_Requests
+STATE_NO_JOB = -1
+STATE_JOB_WAITING_TO_START = 0
+STATE_JOB_IN_PROGRESS = 1
+STATE_JOB_ERROR = 2
+STATE_JOB_ABORTED = 3
+STATE_JOB_DONE = 4
+STATE_JOB_WAITING_FOR_CALLBACK = 5
+STATE_JOB_REQUEUE = 6
+STATE_JOB_PENDING_DATA = 7
+
+
 LOG = logging.getLogger(__name__)
 
 
@@ -27,15 +39,26 @@ class SubscriptionRegistry(object):
             return
 
         LOG.info("Subscribing to events for %s", device.name)
-        # Provide a function to register a callback when the device changes
-        # state
-        device.register_listener = functools.partial(self.on, device, None)
         self._devices[device.vera_device_id] = device
 
-    def _event(self, devices):
-        if devices is None:
-            return
-        for device in devices:
+    def _event(self, device_data_list):
+        for device_data in device_data_list:
+            device_id = device_data['id']
+            state = int(device_data.get('state', STATE_NO_JOB))
+            device = self._devices.get(int(device_id))
+            if device is None:
+                continue
+            if (state == STATE_JOB_WAITING_TO_START or
+                state == STATE_JOB_IN_PROGRESS):
+                LOG.info("Device %s, state %s, %s", device.name, state,
+                            device_data.get('comment',''))
+                continue
+            if not (state == STATE_JOB_DONE or
+                    state == STATE_NO_JOB):
+                LOG.warning("Device %s, state %s, %s", device.name, state,
+                            device_data.get('comment',''))
+                continue
+            device.update(device_data)
             for callback in self._callbacks.get(device, ()):
                 callback(device)
 
@@ -63,15 +86,15 @@ class SubscriptionRegistry(object):
         time.sleep(10)
         while not self._exiting:
             try:
-                device_ids, timestamp = (
+                device_data, timestamp = (
                     controller.get_changed_devices(timestamp))
                 if self._exiting:
                     continue;
-                if device_ids is None:
+                if not device_data:
                     LOG.info("No changes in poll interval")
                     continue;
-                devices = [self._devices.get(int(id)) for id in device_ids]
-                self._event(devices)
+                self._event(device_data)
+                time.sleep(1)
             except requests.RequestException:
                 LOG.info("Could not contact Vera - will retry in %ss",
                          SUBSCRIPTION_RETRY)
