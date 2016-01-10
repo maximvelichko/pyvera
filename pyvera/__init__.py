@@ -49,9 +49,7 @@ class VeraController(object):
         self.categories = {}
         self.device_id_map = {}
 
-
     def get_simple_devices_info(self):
-
         simple_request_url = self.base_url + "/data_request?id=sdata"
         j = requests.get(simple_request_url).json()
 
@@ -378,6 +376,7 @@ class VeraArmableDevice(VeraSwitch):
             self.refresh_value('Armed')
         val = self.get_value('Armed')
         return val == '1'
+
 
 class VeraSensor(VeraDevice):
 
