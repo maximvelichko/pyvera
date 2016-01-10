@@ -19,6 +19,8 @@ STATE_JOB_WAITING_FOR_CALLBACK = 5
 STATE_JOB_REQUEUE = 6
 STATE_JOB_PENDING_DATA = 7
 
+STATE_NOT_PRESENT = 999
+
 
 LOG = logging.getLogger(__name__)
 
@@ -44,25 +46,31 @@ class SubscriptionRegistry(object):
     def _event(self, device_data_list):
         for device_data in device_data_list:
             device_id = device_data['id']
-            state = int(device_data.get('state', STATE_NO_JOB))
+            state = int(device_data.get('state', STATE_NOT_PRESENT))
             device = self._devices.get(int(device_id))
             if device is None:
                 continue
+            # Vera can send an update status STATE_NO_JOB but
+            # with a comment about sending a command
+            comment = device_data.get('comment', '')
+            sending = comment.find('Sending') >= 0
+            if (sending and state == STATE_NO_JOB):
+                state = STATE_JOB_WAITING_TO_START
+
             if (
                     state == STATE_JOB_WAITING_TO_START or
                     state == STATE_JOB_IN_PROGRESS or
                     state == STATE_JOB_WAITING_FOR_CALLBACK or
                     state == STATE_JOB_REQUEUE or
                     state == STATE_JOB_PENDING_DATA):
-                LOG.warning("Pending: device %s, state %s, %s",
-                            device.name,
-                            state,
-                            device_data.get('comment', ''))
                 continue
             if not (state == STATE_JOB_DONE or
+                    state == STATE_NOT_PRESENT or
                     state == STATE_NO_JOB):
-                LOG.error("Device %s, state %s, %s", device.name, state,
-                          device_data.get('comment', ''))
+                LOG.error("Device %s, state %s, %s",
+                          device.name,
+                          state,
+                          comment)
                 continue
             device.update(device_data)
             for callback in self._callbacks.get(device, ()):
