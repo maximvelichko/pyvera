@@ -54,7 +54,7 @@ class SubscriptionRegistry(object):
             # with a comment about sending a command
             comment = device_data.get('comment', '')
             sending = comment.find('Sending') >= 0
-            if (sending and state == STATE_NO_JOB):
+            if sending and state == STATE_NO_JOB:
                 state = STATE_JOB_WAITING_TO_START
 
             if (
