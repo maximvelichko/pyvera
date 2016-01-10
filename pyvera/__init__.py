@@ -37,8 +37,8 @@ class VeraController(object):
 
     temperature_units = 'C'
 
-    def __init__(self, baseUrl):
-        self.BASE_URL = baseUrl
+    def __init__(self, base_url):
+        self.base_url = base_url
         self.devices = []
         self.temperature_units = 'C'
         self.version = None
@@ -46,11 +46,14 @@ class VeraController(object):
         self.serial_number = None
         self.device_services_map = None
         self.subscription_registry = SubscriptionRegistry()
+        self.categories = {}
+        self.device_id_map = {}
+
 
     def get_simple_devices_info(self):
 
-        simpleRequestUrl = self.BASE_URL + "/data_request?id=sdata"
-        j = requests.get(simpleRequestUrl).json()
+        simple_request_url = self.base_url + "/data_request?id=sdata"
+        j = requests.get(simple_request_url).json()
 
         if j.get('temperature'):
             self.temperature_units = j.get('temperature')
@@ -68,17 +71,17 @@ class VeraController(object):
             dev['categoryName'] = self.categories.get(dev.get('category'))
             self.device_id_map[dev.get('id')] = dev
 
-    # get list of connected devices, the categoryFilter param can be either
+    # get list of connected devices, the category_filter param can be either
     # a string or array of strings
-    def get_devices(self, categoryFilter=''):
+    def get_devices(self, category_filter=''):
 
         # the Vera rest API is a bit rough so we need to make 2 calls to get
         # all the info e need
         self.get_simple_devices_info()
 
-        arequestUrl = (self.BASE_URL
-                       + "/data_request?id=status&output_format=json")
-        j = requests.get(arequestUrl).json()
+        arequest_url = (self.base_url
+                        + "/data_request?id=status&output_format=json")
+        j = requests.get(arequest_url).json()
 
         self.devices = []
         items = j.get('devices')
@@ -117,24 +120,24 @@ class VeraController(object):
             else:
                 self.devices.append(VeraDevice(item, self))
 
-        if categoryFilter == '':
+        if category_filter == '':
             return self.devices
         else:
-            filterCategories = []
-            if isinstance(categoryFilter, str):
-                filterCategories.append(categoryFilter)
+            filter_categories = []
+            if isinstance(category_filter, str):
+                filter_categories.append(category_filter)
             else:
-                filterCategories = categoryFilter
+                filter_categories = category_filter
 
             devices = []
             for item in self.devices:
-                if item.category in filterCategories:
+                if item.category in filter_categories:
                     devices.append(item)
             return devices
 
     def refresh_data(self):
-        simpleRequestUrl = self.BASE_URL + "/data_request?id=sdata"
-        j = requests.get(simpleRequestUrl).json()
+        simple_request_url = self.base_url + "/data_request?id=sdata"
+        j = requests.get(simple_request_url).json()
 
         self.temperature_units = j.get('temperature', 'C')
         self.model = j.get('model')
@@ -162,9 +165,9 @@ class VeraController(object):
         # to get all the info e need
         self.get_simple_devices_info()
 
-        arequestUrl = (self.BASE_URL
-                       + "/data_request?id=status&output_format=json")
-        j = requests.get(arequestUrl).json()
+        arequest_url = (self.base_url
+                        + "/data_request?id=status&output_format=json")
+        j = requests.get(arequest_url).json()
 
         service_map = {}
 
@@ -175,45 +178,8 @@ class VeraController(object):
 
         self.device_services_map = service_map
 
-    def set_value(self, device_id, name, value):
-        if self.device_services_map is None:
-            self.map_services()
-
-        if device_id not in self.device_services_map.keys():
-            return
-
-        states = self.device_services_map.get(device_id)
-
-        for item in states:
-            if item.get('variable') == name:
-                serviceName = item.get('service')
-
-                # The Vera API is very inconsistent so we
-                # can't be very generic here unfortunately
-                if name == 'LoadLevelTarget':
-                    # note the incredibly lame change to
-                    # the last payload parameter
-                    payload = {
-                        'id': 'lu_action',
-                        'output_format': 'json',
-                        'DeviceNum': device_id,
-                        'serviceId': serviceName,
-                        'action': 'Set' + name,
-                        'newLoadlevelTarget': value}
-                else:
-                    payload = {
-                        'id': 'lu_action',
-                        'output_format': 'json',
-                        'DeviceNum': device_id,
-                        'serviceId': serviceName,
-                        'action': 'Set' + name,
-                        'new' + name + 'Value': value}
-
-                requestUrl = self.BASE_URL + "/data_request"
-                requests.get(requestUrl, params=payload)
-
     def get_changed_devices(self, timestamp):
-        simpleRequestUrl = self.BASE_URL + "/data_request?id=lu_sdata"
+        simple_request_url = self.base_url + "/data_request?id=lu_sdata"
         if timestamp is None:
             payload = {}
         else:
@@ -222,7 +188,7 @@ class VeraController(object):
                 'minimumdelay': SUBSCRIPTION_MIN_WAIT
             }
             payload.update(timestamp)
-        result = requests.get(simpleRequestUrl, params=payload).json()
+        result = requests.get(simple_request_url, params=payload).json()
         device_data = result.get('devices')
         timestamp = {
             'loadtime': result.get('loadtime'),
@@ -242,29 +208,28 @@ class VeraController(object):
 
 class VeraDevice(object):
 
-    def __init__(self, aJSonObj, veraController):
-        self.jsonState = aJSonObj
-        self.deviceId = self.jsonState.get('id')
-        self.veraController = veraController
+    def __init__(self, json_obj, vera_controller):
+        self.json_state = json_obj
+        self.device_id = self.json_state.get('id')
+        self.vera_controller = vera_controller
         self.name = ''
-        if self.jsonState.get('deviceInfo'):
+        if self.json_state.get('deviceInfo'):
             self.category = (
-                self.jsonState.get('deviceInfo').get('categoryName'))
-            self.name = self.jsonState.get('deviceInfo').get('name')
+                self.json_state.get('deviceInfo').get('categoryName'))
+            self.name = self.json_state.get('deviceInfo').get('name')
         else:
             self.category = ''
 
         if not self.name:
             if self.category:
-                self.name = 'Vera ' + self.category + ' ' + str(self.deviceId)
+                self.name = 'Vera ' + self.category + ' ' + str(self.device_id)
             else:
-                self.name = 'Vera Device ' + str(self.deviceId)
+                self.name = 'Vera Device ' + str(self.device_id)
 
     def set_value(self, name, value):
-        print("VERA SET", self)
-        for item in self.jsonState.get('states'):
+        for item in self.json_state.get('states'):
             if item.get('variable') == name:
-                serviceName = item.get('service')
+                service_name = item.get('service')
                 # The Vera API is very inconsistent so we can't be very
                 # generic here unfortunately
                 if name == 'LoadLevelTarget':
@@ -273,57 +238,53 @@ class VeraDevice(object):
                     payload = {
                         'id': 'lu_action',
                         'output_format': 'json',
-                        'DeviceNum': self.deviceId,
-                        'serviceId': serviceName,
+                        'DeviceNum': self.device_id,
+                        'serviceId': service_name,
                         'action': 'Set' + name,
                         'newLoadlevelTarget': value}
                 else:
                     payload = {
                         'id': 'lu_action',
                         'output_format': 'json',
-                        'DeviceNum': self.deviceId,
-                        'serviceId': serviceName,
+                        'DeviceNum': self.device_id,
+                        'serviceId': service_name,
                         'action': 'Set' + name,
                         'new' + name + 'Value': value}
-                requestUrl = self.veraController.BASE_URL + "/data_request"
-                requests.get(requestUrl, params=payload)
+                request_url = self.vera_controller.base_url + "/data_request"
+                requests.get(request_url, params=payload)
                 item['value'] = value
 
     def get_value(self, name):
-        for item in self.jsonState.get('states'):
+        for item in self.json_state.get('states'):
             if item.get('variable') == name:
                 return item.get('value')
         return None
 
     def refresh_value(self, name):
-        for item in self.jsonState.get('states'):
+        for item in self.json_state.get('states'):
             if item.get('variable') == name:
-                serviceName = item.get('service')
+                service_name = item.get('service')
                 payload = {
                     'id': 'variableget',
                     'output_format': 'json',
-                    'DeviceNum': self.deviceId,
-                    'serviceId': serviceName,
+                    'DeviceNum': self.device_id,
+                    'serviceId': service_name,
                     'Variable': name}
-                requestUrl = self.veraController.BASE_URL + "/data_request"
-                r = requests.get(requestUrl, params=payload)
-                item['value'] = r.text
+                request_url = self.vera_controller.base_url + "/data_request"
+                result = requests.get(request_url, params=payload)
+                item['value'] = result.text
                 return item.get('value')
         return None
 
-
     def update(self, params):
         for key in params:
-             for item in self.jsonState.get('states'):
+            for item in self.json_state.get('states'):
                 if item.get('variable').lower() == key.lower():
                     item['value'] = params[key]
 
     @property
     def is_armable(self):
-        if self.get_value('Armed') is not None:
-            return True
-        else:
-            return False
+        return self.get_value('Armed') is not None
 
     @property
     def is_dimmable(self):
@@ -331,17 +292,11 @@ class VeraDevice(object):
 
     @property
     def is_trippable(self):
-        if self.get_value('Tripped') is not None:
-            return True
-        else:
-            return False
+        return self.get_value('Tripped') is not None
 
     @property
     def has_battery(self):
-        if self.get_value('BatteryLevel') is not None:
-            return True
-        else:
-            return False
+        return self.get_value('BatteryLevel') is not None
 
     @property
     def battery_level(self):
@@ -349,13 +304,13 @@ class VeraDevice(object):
 
     @property
     def vera_device_id(self):
-        return self.deviceId
+        return self.device_id
 
 
 class VeraSwitch(VeraDevice):
 
-    def __init__(self, aJSonObj, veraController):
-        super().__init__(aJSonObj, veraController)
+    def __init__(self, json_obj, vera_controller):
+        super().__init__(json_obj, vera_controller)
 
     def switch_on(self):
         self.set_value('Target', 1)
@@ -367,16 +322,13 @@ class VeraSwitch(VeraDevice):
         if refresh:
             self.refresh_value('Status')
         val = self.get_value('Status')
-        if val == '1':
-            return True
-        else:
-            return False
+        return val == '1'
 
 
 class VeraDimmer(VeraSwitch):
 
-    def __init__(self, aJSonObj, veraController):
-        super().__init__(aJSonObj, veraController)
+    def __init__(self, json_obj, vera_controller):
+        super().__init__(json_obj, vera_controller)
         self.brightness = None
 
     def switch_on(self):
@@ -412,8 +364,8 @@ class VeraDimmer(VeraSwitch):
 
 class VeraArmableDevice(VeraSwitch):
 
-    def __init__(self, aJSonObj, veraController):
-        super().__init__(aJSonObj, veraController)
+    def __init__(self, json_obj, vera_controller):
+        super().__init__(json_obj, vera_controller)
 
     def switch_on(self):
         self.set_value('Armed', 1)
@@ -421,19 +373,16 @@ class VeraArmableDevice(VeraSwitch):
     def switch_off(self):
         self.set_value('Armed', 0)
 
-    def is_switched_on(self):
-        self.refresh_value('Armed')
+    def is_switched_on(self, refresh=False):
+        if refresh:
+            self.refresh_value('Armed')
         val = self.get_value('Armed')
-        if val == '1':
-            return True
-        else:
-            return False
-
+        return val == '1'
 
 class VeraSensor(VeraDevice):
 
-    def __init__(self, aJSonObj, veraController):
-        super().__init__(aJSonObj, veraController)
+    def __init__(self, json_obj, vera_controller):
+        super().__init__(json_obj, vera_controller)
 
     def switch_on(self):
         self.set_value('Target', 1)
@@ -444,7 +393,4 @@ class VeraSensor(VeraDevice):
     def is_switched_on(self):
         self.refresh_value('Status')
         val = self.get_value('Status')
-        if val == '1':
-            return True
-        else:
-            return False
+        return val == '1'
