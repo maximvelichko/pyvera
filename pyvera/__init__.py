@@ -1,4 +1,6 @@
 import requests
+import logging
+
 
 from .subscribe import SubscriptionRegistry
 
@@ -18,6 +20,7 @@ SUBSCRIPTION_MIN_WAIT = 200
 
 _VERA_CONTROLLER = None
 
+LOG = logging.getLogger(__name__)
 
 def init_controller(url):
     global _VERA_CONTROLLER
@@ -252,13 +255,21 @@ class VeraDevice(object):
                 requests.get(request_url, params=payload)
                 item['value'] = value
 
-    def get_value(self, name):
+    def get_complex_value(self, name):
+        # Gets a value from the service dictionaries
+        # best to use normal get_value if if it has the data
         for item in self.json_state.get('states'):
             if item.get('variable') == name:
                 return item.get('value')
         return None
 
-    def refresh_value(self, name):
+    def get_value(self, name):
+        dev_info = self.json_state.get('deviceInfo')
+        return dev_info.get(name.lower(), None)
+
+    def refresh_complex_value(self, name):
+        # Refresh a value from the service dictionaries
+        # best to use normal get_value / refresh if it has the data
         for item in self.json_state.get('states'):
             if item.get('variable') == name:
                 service_name = item.get('service')
@@ -274,15 +285,27 @@ class VeraDevice(object):
                 return item.get('value')
         return None
 
+    def refresh(self):
+        arequest_url = (self.vera_controller.base_url
+                        + "/data_request?id=sdata&output_format=json")
+        j = requests.get(arequest_url).json()
+        devices = j.get('devices')
+        for device_data in devices:
+            if device_data.get('id') == self.device_id:
+                self.update(device_data)
+
     def update(self, params):
-        for key in params:
-            for item in self.json_state.get('states'):
-                if item.get('variable').lower() == key.lower():
-                    item['value'] = params[key]
+        LOG.error("UPDATE %s deviceInfo %s", self.name, self.json_state.get("deviceInfo"))
+        dev_info = self.json_state.get('deviceInfo')
+        dev_info.update({k:params[k]  for k in params if dev_info.get(k)})
 
     @property
     def is_armable(self):
         return self.get_value('Armed') is not None
+
+    @property
+    def is_armed(self):
+        return self.get_value('Armed') == '1'
 
     @property
     def is_dimmable(self):
@@ -293,12 +316,33 @@ class VeraDevice(object):
         return self.get_value('Tripped') is not None
 
     @property
+    def is_tripped(self):
+        return self.get_value('Tripped') == '1'
+
+    @property
     def has_battery(self):
         return self.get_value('BatteryLevel') is not None
 
     @property
     def battery_level(self):
-        return self.refresh_value('BatteryLevel')
+        return self.get_value('BatteryLevel')
+
+    @property
+    def last_trip(self):
+        return self.get_value('LastTrip')
+
+    @property
+    def light(self):
+        return self.get_value('Light')
+
+    @property
+    def temperature(self):
+        return self.get_value('Temperature')
+
+    @property
+    def humidity(self):
+        return self.get_value('Humidity')
+
 
     @property
     def vera_device_id(self):
@@ -318,7 +362,7 @@ class VeraSwitch(VeraDevice):
 
     def is_switched_on(self, refresh=False):
         if refresh:
-            self.refresh_value('Status')
+            self.refresh()
         val = self.get_value('Status')
         return val == '1'
 
@@ -327,28 +371,28 @@ class VeraDimmer(VeraSwitch):
 
     def __init__(self, json_obj, vera_controller):
         super().__init__(json_obj, vera_controller)
-        self.brightness = None
 
     def switch_on(self):
-        self.set_brightness(self.brightness or 254)
+        self.set_brightness(254)
 
     def switch_off(self):
-        self.brightness = 0
-        self.set_brightness(self.brightness)
+        self.set_brightness(0)
 
     def is_switched_on(self, refresh=False):
+        if refresh:
+            self.refresh()
         return self.get_brightness(refresh) > 0
 
     def get_brightness(self, refresh=False):
         """ Converts the Vera level property for dimmable lights from a
         percentage to the 0 - 255 scale used by HA """
-        if self.brightness is not None and not refresh:
-            return self.brightness
-        percent = int(self.refresh_value('LoadLevelStatus'))
-        self.brightness = 0
+        if refresh:
+            self.refresh()
+        percent = int(self.get_value('level'))
+        brightness = 0
         if percent > 0:
-            self.brightness = round(percent * 2.55)
-        return int(self.brightness)
+            brightness = round(percent * 2.55)
+        return int(brightness)
 
     def set_brightness(self, brightness):
         """ Converts the Vera level property for dimmable lights from a
@@ -356,7 +400,6 @@ class VeraDimmer(VeraSwitch):
         percent = 0
         if brightness > 0:
             percent = round(brightness / 2.55)
-        self.brightness = brightness
         self.set_value('LoadLevelTarget', percent)
 
 
@@ -373,7 +416,7 @@ class VeraArmableDevice(VeraSwitch):
 
     def is_switched_on(self, refresh=False):
         if refresh:
-            self.refresh_value('Armed')
+            self.refresh()
         val = self.get_value('Armed')
         return val == '1'
 
@@ -389,7 +432,8 @@ class VeraSensor(VeraDevice):
     def switch_off(self):
         self.set_value('Target', 0)
 
-    def is_switched_on(self):
-        self.refresh_value('Status')
+    def is_switched_on(self, refresh=False):
+        if refresh:
+            self.refresh()
         val = self.get_value('Status')
         return val == '1'
