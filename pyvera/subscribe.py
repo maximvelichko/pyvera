@@ -5,8 +5,8 @@ import time
 import threading
 import requests
 
-SUBSCRIPTION_RETRY = 60
-# Time to wait for event in seconds
+# How long to wait before retrying Vera
+SUBSCRIPTION_RETRY = 10
 
 # Vera stae codes see http://wiki.micasaverde.com/index.php/Luup_Requests
 STATE_NO_JOB = -1
@@ -62,7 +62,6 @@ class SubscriptionRegistry(object):
             sending = comment.find('Sending') >= 0
             if sending and state == STATE_NO_JOB:
                 state = STATE_JOB_WAITING_TO_START
-
             if (
                     state == STATE_JOB_WAITING_TO_START or
                     state == STATE_JOB_IN_PROGRESS or
@@ -98,9 +97,6 @@ class SubscriptionRegistry(object):
         from pyvera import get_controller
         controller = get_controller()
         timestamp = None
-        # Wait for code to initialize to avoid callbacks before ready
-        # Initial state callbacks are instant!
-        time.sleep(10)
         while not self._exiting:
             try:
                 device_data, timestamp = (
