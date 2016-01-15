@@ -29,7 +29,7 @@ class SubscriptionRegistry(object):
     """Class for subscribing to wemo events."""
 
     def __init__(self):
-        self._devices = {}
+        self._devices = collections.defaultdict(list)
         self._callbacks = collections.defaultdict(list)
         self._exiting = False
         self._poll_thread = None
@@ -40,18 +40,22 @@ class SubscriptionRegistry(object):
             return
 
         LOG.info("Subscribing to events for %s", device.name)
-        self._devices[device.vera_device_id] = device
+        self._devices[device.vera_device_id].append(device)
         self._callbacks[device].append((callback))
 
     def _event(self, device_data_list):
         for device_data in device_data_list:
             device_id = device_data['id']
-            state = int(device_data.get('state', STATE_NOT_PRESENT))
-            device = self._devices.get(int(device_id))
+            device_list = self._devices.get(int(device_id))
+            for device in device_list:
+                self._event_device(device, device_data)
+
+    def _event_device(self, device, device_data):
             if device is None:
-                continue
+                return
             # Vera can send an update status STATE_NO_JOB but
             # with a comment about sending a command
+            state = int(device_data.get('state', STATE_NOT_PRESENT))
             comment = device_data.get('comment', '')
             sending = comment.find('Sending') >= 0
             if sending and state == STATE_NO_JOB:
@@ -63,7 +67,7 @@ class SubscriptionRegistry(object):
                     state == STATE_JOB_WAITING_FOR_CALLBACK or
                     state == STATE_JOB_REQUEUE or
                     state == STATE_JOB_PENDING_DATA):
-                continue
+                return
             if not (state == STATE_JOB_DONE or
                     state == STATE_NOT_PRESENT or
                     state == STATE_NO_JOB):
@@ -71,7 +75,7 @@ class SubscriptionRegistry(object):
                           device.name,
                           state,
                           comment)
-                continue
+                return
             device.update(device_data)
             for callback in self._callbacks.get(device, ()):
                 callback(device)
