@@ -47,6 +47,8 @@ class SubscriptionRegistry(object):
         for device_data in device_data_list:
             device_id = device_data['id']
             device_list = self._devices.get(int(device_id))
+            if device_list is None:
+                return
             for device in device_list:
                 self._event_device(device, device_data)
 
