@@ -35,6 +35,8 @@ class SubscriptionRegistry(object):
         self._poll_thread = None
 
     def register(self, device, callback):
+        """Register a device to be updated by subscription and
+            provide a callback for notification."""
         if not device:
             LOG.error("Received an invalid device: %r", device)
             return
@@ -53,44 +55,47 @@ class SubscriptionRegistry(object):
                 self._event_device(device, device_data)
 
     def _event_device(self, device, device_data):
-            if device is None:
-                return
-            # Vera can send an update status STATE_NO_JOB but
-            # with a comment about sending a command
-            state = int(device_data.get('state', STATE_NOT_PRESENT))
-            comment = device_data.get('comment', '')
-            sending = comment.find('Sending') >= 0
-            if sending and state == STATE_NO_JOB:
-                state = STATE_JOB_WAITING_TO_START
-            if (
-                    state == STATE_JOB_WAITING_TO_START or
-                    state == STATE_JOB_IN_PROGRESS or
-                    state == STATE_JOB_WAITING_FOR_CALLBACK or
-                    state == STATE_JOB_REQUEUE or
-                    state == STATE_JOB_PENDING_DATA):
-                return
-            if not (state == STATE_JOB_DONE or
-                    state == STATE_NOT_PRESENT or
-                    state == STATE_NO_JOB):
-                LOG.error("Device %s, state %s, %s",
-                          device.name,
-                          state,
-                          comment)
-                return
-            device.update(device_data)
-            for callback in self._callbacks.get(device, ()):
-                callback(device)
+        if device is None:
+            return
+        # Vera can send an update status STATE_NO_JOB but
+        # with a comment about sending a command
+        state = int(device_data.get('state', STATE_NOT_PRESENT))
+        comment = device_data.get('comment', '')
+        sending = comment.find('Sending') >= 0
+        if sending and state == STATE_NO_JOB:
+            state = STATE_JOB_WAITING_TO_START
+        if (
+                state == STATE_JOB_WAITING_TO_START or
+                state == STATE_JOB_IN_PROGRESS or
+                state == STATE_JOB_WAITING_FOR_CALLBACK or
+                state == STATE_JOB_REQUEUE or
+                state == STATE_JOB_PENDING_DATA):
+            return
+        if not (state == STATE_JOB_DONE or
+                state == STATE_NOT_PRESENT or
+                state == STATE_NO_JOB):
+            LOG.error("Device %s, state %s, %s",
+                      device.name,
+                      state,
+                      comment)
+            return
+        device.update(device_data)
+        for callback in self._callbacks.get(device, ()):
+            callback(device)
 
     def join(self):
+        """Don't allow the main thread to terminate until we have"""
         self._poll_thread.join()
 
     def start(self):
+        """Start a thread to handle Vera blocked polling"""
         self._poll_thread = threading.Thread(target=self._run_poll_server,
                                              name='Vera Poll Thread')
         self._poll_thread.deamon = True
         self._poll_thread.start()
 
     def stop(self):
+        """Tell the subscription thread to terminate"""
         self._exiting = True
 
     def _run_poll_server(self):
