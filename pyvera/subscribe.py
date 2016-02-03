@@ -118,7 +118,7 @@ class SubscriptionRegistry(object):
                 LOG.info("Could not contact Vera - will retry in %ss",
                          SUBSCRIPTION_RETRY)
                 time.sleep(SUBSCRIPTION_RETRY)
-            except as ex:
+            except Exception as ex:
                 LOG.exception("Vera thread exception %s", ex)
                 raise
 
