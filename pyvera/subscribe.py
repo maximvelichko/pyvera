@@ -8,7 +8,7 @@ import requests
 # How long to wait before retrying Vera
 SUBSCRIPTION_RETRY = 10
 
-# Vera stae codes see http://wiki.micasaverde.com/index.php/Luup_Requests
+# Vera state codes see http://wiki.micasaverde.com/index.php/Luup_Requests
 STATE_NO_JOB = -1
 STATE_JOB_WAITING_TO_START = 0
 STATE_JOB_IN_PROGRESS = 1
@@ -106,6 +106,7 @@ class SubscriptionRegistry(object):
             try:
                 device_data, timestamp = (
                     controller.get_changed_devices(timestamp))
+                LOG.info("Poll returned")
                 if self._exiting:
                     continue
                 if not device_data:
@@ -117,5 +118,8 @@ class SubscriptionRegistry(object):
                 LOG.info("Could not contact Vera - will retry in %ss",
                          SUBSCRIPTION_RETRY)
                 time.sleep(SUBSCRIPTION_RETRY)
+            except Exception as ex:
+                LOG.exception("Vera thread exception %s", ex)
+                raise
 
         LOG.info("Shutdown Vera Poll Thread")

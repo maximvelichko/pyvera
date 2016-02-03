@@ -449,8 +449,9 @@ class VeraDimmer(VeraSwitch):
            used by HA """
         if refresh:
             self.refresh()
-        percent = int(self.get_value('level'))
         brightness = 0
+        level = self.get_value('level')
+        percent = 0 if level is None else int(level)
         if percent > 0:
             brightness = round(percent * 2.55)
         return int(brightness)
