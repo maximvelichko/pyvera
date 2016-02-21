@@ -125,6 +125,10 @@ class VeraController(object):
                   item.get('deviceInfo').get('categoryName') ==
                   'Light Sensor'):
                 self.devices.append(VeraSensor(item, self))
+            elif (item.get('deviceInfo') and
+                  item.get('deviceInfo').get('categoryName') ==
+                  'Window Covering'):
+                self.devices.append(VeraCurtain(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
 
@@ -132,9 +136,10 @@ class VeraController(object):
             return self.devices
         else:
             devices = []
-            for item in self.devices:
-                if item.category in category_filter:
-                    devices.append(item)
+            for device in self.devices:
+                if (device.category != None and device.category != '' and 
+                       device.category in category_filter):
+                    devices.append(device)
             return devices
 
     def refresh_data(self):
@@ -522,3 +527,49 @@ class VeraSensor(VeraDevice):
             self.refresh()
         val = self.get_value('Status')
         return val == '1'
+
+
+class VeraCurtain(VeraSwitch):
+    """Class to add curtains functionality."""
+
+    def __init__(self, json_obj, vera_controller):
+        super().__init__(json_obj, vera_controller)
+
+    def open(self):
+        """Open the curtains."""
+        self.set_level(254)
+
+    def close(self):
+        """Close the curtains."""
+        self.set_level(0)
+
+    def is_open(self, refresh=False):
+        """Get curtains state, refresh data from Vera if refresh is True,
+           otherwise use local cache. Refresh is only needed if you're
+           not using subscriptions."""
+        if refresh:
+            self.refresh()
+        return self.get_level(refresh) > 0
+
+    def get_level(self, refresh=False):
+        """Get open level of the curtains, refresh data from Vera if refresh is 
+           True, otherwise use local cache. Refresh is only needed if you're
+           not using subscriptions. Converts the Vera level property for
+           curtains from a percentage to the 0 - 255 scale used by HA."""
+        if refresh:
+            self.refresh()
+        value = 0
+        level = self.get_value('level')
+        percent = 0 if level is None else int(level)
+        if percent > 0:
+            value = round(percent * 2.55)
+        return int(value)
+
+    def set_level(self, level):
+        """Set open level of the curtains. Converts the Vera level property for
+        curtains from a percentage to the 0 - 255 scale used by HA."""
+        percent = 0
+        if level > 0:
+            percent = round(level / 2.55)
+        self.set_value('LoadLevelTarget', percent)
+        self.set_cache_value('level', percent)
