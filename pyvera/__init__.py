@@ -137,7 +137,8 @@ class VeraController(object):
         else:
             devices = []
             for device in self.devices:
-                if device.category != None and device.category != '' and device.category in category_filter:
+                if (device.category != None and device.category != '' and 
+                       device.category in category_filter):
                     devices.append(device)
             return devices
 
