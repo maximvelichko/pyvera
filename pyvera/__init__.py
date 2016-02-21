@@ -132,9 +132,9 @@ class VeraController(object):
             return self.devices
         else:
             devices = []
-            for item in self.devices:
-                if item.category in category_filter:
-                    devices.append(item)
+            for device in self.devices:
+                if device.category != None and device.category != '' and device.category in category_filter:
+                    devices.append(device)
             return devices
 
     def refresh_data(self):
