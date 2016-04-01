@@ -97,6 +97,9 @@ class SubscriptionRegistry(object):
     def stop(self):
         """Tell the subscription thread to terminate"""
         self._exiting = True
+        self.join()
+        LOG.info("Terminated thread")
+
 
     def _run_poll_server(self):
         from pyvera import get_controller
