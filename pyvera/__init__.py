@@ -129,6 +129,10 @@ class VeraController(object):
                   item.get('deviceInfo').get('categoryName') ==
                   'Window Covering'):
                 self.devices.append(VeraCurtain(item, self))
+            elif (item.get('deviceInfo') and
+                  item.get('deviceInfo').get('categoryName') ==
+                  'Doorlock'):
+                self.devices.append(VeraLock(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
 
@@ -573,3 +577,30 @@ class VeraCurtain(VeraSwitch):
             percent = round(level / 2.55)
         self.set_value('LoadLevelTarget', percent)
         self.set_cache_value('level', percent)
+
+
+class VeraLock(VeraDevice):
+    """Class to represent a doorlock"""
+
+    def __init__(self, json_obj, vera_controller):
+        super().__init__(json_obj, vera_controller)
+
+    def lock(self):
+        """Lock the door"""
+
+        self.set_value('Target', 1)
+
+    def unlock(self):
+        """Unlock the device"""
+
+        self.set_value('Target', 0)
+
+    def is_locked(self, refresh=False):
+        """Get locked state, refresh data from Vera if refresh is True,
+           otherwise use local cache. Refresh is only needed if you're
+           not using subscriptions. """
+
+        if refresh:
+            self.refresh_complex_value('Status')
+        val = self.get_complex_value('Status')
+        return val == '1'
