@@ -582,6 +582,8 @@ class VeraCurtain(VeraSwitch):
 class VeraLock(VeraDevice):
     """Class to represent a doorlock"""
 
+    is_lock = True
+
     def __init__(self, json_obj, vera_controller):
         super().__init__(json_obj, vera_controller)
 
