@@ -21,7 +21,6 @@ STATE_JOB_PENDING_DATA = 7
 
 STATE_NOT_PRESENT = 999
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -64,6 +63,9 @@ class SubscriptionRegistry(object):
         sending = comment.find('Sending') >= 0
         if sending and state == STATE_NO_JOB:
             state = STATE_JOB_WAITING_TO_START
+        if (state == STATE_JOB_IN_PROGRESS and isinstance(device, VeraLock)):
+            # VeraLocks don't complete - so force state
+            state = STATE_JOB_DONE
         if (
                 state == STATE_JOB_WAITING_TO_START or
                 state == STATE_JOB_IN_PROGRESS or
