@@ -141,7 +141,7 @@ class VeraController(object):
         else:
             devices = []
             for device in self.devices:
-                if (device.category != None and device.category != '' and 
+                if (device.category != None and device.category != '' and
                        device.category in category_filter):
                     devices.append(device)
             return devices
@@ -397,6 +397,11 @@ class VeraDevice(object):
         return self.get_value('Humidity')
 
     @property
+    def power(self):
+        """Current power useage in watts"""
+        return self.get_value('Watts')
+
+    @property
     def vera_device_id(self):
         """The id vera used to refer to the device"""
         return self.device_id
@@ -556,7 +561,7 @@ class VeraCurtain(VeraSwitch):
         return self.get_level(refresh) > 0
 
     def get_level(self, refresh=False):
-        """Get open level of the curtains, refresh data from Vera if refresh is 
+        """Get open level of the curtains, refresh data from Vera if refresh is
            True, otherwise use local cache. Refresh is only needed if you're
            not using subscriptions. Converts the Vera level property for
            curtains from a percentage to the 0 - 255 scale used by HA."""
