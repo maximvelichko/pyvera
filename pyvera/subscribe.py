@@ -63,21 +63,19 @@ class SubscriptionRegistry(object):
         sending = comment.find('Sending') >= 0
         if sending and state == STATE_NO_JOB:
             state = STATE_JOB_WAITING_TO_START
-        if state == STATE_JOB_IN_PROGRESS and hasattr(device, 'is_lock'):
-            LOG.error("Device %s, lock state %s, %s",
-                      device.name,
-                      state,
-                      comment)
-        elif (
+        if (state == STATE_JOB_IN_PROGRESS and isinstance(device, VeraLock)):
+            # VeraLocks don't complete - so force state
+            state = STATE_JOB_DONE
+        if (
                 state == STATE_JOB_WAITING_TO_START or
                 state == STATE_JOB_IN_PROGRESS or
                 state == STATE_JOB_WAITING_FOR_CALLBACK or
                 state == STATE_JOB_REQUEUE or
                 state == STATE_JOB_PENDING_DATA):
             return
-        elif not (state == STATE_JOB_DONE or
-                  state == STATE_NOT_PRESENT or
-                  state == STATE_NO_JOB):
+        if not (state == STATE_JOB_DONE or
+                state == STATE_NOT_PRESENT or
+                state == STATE_NO_JOB):
             LOG.error("Device %s, state %s, %s",
                       device.name,
                       state,
