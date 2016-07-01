@@ -28,14 +28,18 @@ class SubscriptionRegistry(object):
     """Class for subscribing to wemo events."""
 
     def __init__(self):
+        """Setup subscription."""
         self._devices = collections.defaultdict(list)
         self._callbacks = collections.defaultdict(list)
         self._exiting = False
         self._poll_thread = None
 
     def register(self, device, callback):
-        """Register a device to be updated by subscription and
-            provide a callback for notification."""
+        """Register a callback.
+
+        device: device to be updated by subscription
+        callback: callback for notification of changes
+        """
         if not device:
             LOG.error("Received an invalid device: %r", device)
             return
@@ -86,22 +90,21 @@ class SubscriptionRegistry(object):
             callback(device)
 
     def join(self):
-        """Don't allow the main thread to terminate until we have"""
+        """Don't allow the main thread to terminate until we have."""
         self._poll_thread.join()
 
     def start(self):
-        """Start a thread to handle Vera blocked polling"""
+        """Start a thread to handle Vera blocked polling."""
         self._poll_thread = threading.Thread(target=self._run_poll_server,
                                              name='Vera Poll Thread')
         self._poll_thread.deamon = True
         self._poll_thread.start()
 
     def stop(self):
-        """Tell the subscription thread to terminate"""
+        """Tell the subscription thread to terminate."""
         self._exiting = True
         self.join()
         LOG.info("Terminated thread")
-
 
     def _run_poll_server(self):
         from pyvera import get_controller
