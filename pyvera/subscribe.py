@@ -63,7 +63,8 @@ class SubscriptionRegistry(object):
         sending = comment.find('Sending') >= 0
         if sending and state == STATE_NO_JOB:
             state = STATE_JOB_WAITING_TO_START
-        if (state == STATE_JOB_IN_PROGRESS and isinstance(device, VeraLock)):
+        if (state == STATE_JOB_IN_PROGRESS and
+                device.__class__.__name__ == 'VeraLock'):
             # VeraLocks don't complete - so force state
             state = STATE_JOB_DONE
         if (
