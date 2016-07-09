@@ -152,7 +152,7 @@ class VeraController(object):
                   item.get('deviceInfo').get('categoryName') ==
                   'Door lock'):
                 doorlock = VeraLock(item, self)
-                doorlock.category = "Doorlock"
+                doorlock.category = 'Doorlock'
                 self.devices.append(doorlock)
             else:
                 self.devices.append(VeraDevice(item, self))
