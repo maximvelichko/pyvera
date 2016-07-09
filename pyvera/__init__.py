@@ -115,7 +115,7 @@ class VeraController(object):
                 self.devices.append(VeraSwitch(item, self))
             elif (item.get('deviceInfo') and
                   item.get('deviceInfo').get('categoryName') ==
-                  'Dimmable Switch'):        
+                  'Dimmable Switch'):
                 self.devices.append(VeraDimmer(item, self))
             elif (item.get('deviceInfo') and
                   item.get('deviceInfo').get('categoryName') ==
