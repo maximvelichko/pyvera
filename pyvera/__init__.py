@@ -119,18 +119,24 @@ class VeraController(object):
                 self.devices.append(VeraDimmer(item, self))
             elif (item.get('deviceInfo') and
                   item.get('deviceInfo').get('categoryName') ==
-                  'Dimmable Light'):        
-                dimmer = VeraDimmer(item, self)
-                dimmer.category = "Dimmable Switch"
-                self.devices.append(dimmer)
+                  'Dimmable Light'):
+                self.devices.append(VeraDimmer(item, self))
             elif (item.get('deviceInfo') and
                   item.get('deviceInfo').get('categoryName') ==
                   'Temperature Sensor'):
                 self.devices.append(VeraSensor(item, self))
             elif (item.get('deviceInfo') and
                   item.get('deviceInfo').get('categoryName') ==
+                  'Humidity Sensor'):
+                self.devices.append(VeraSensor(item, self))
+            elif (item.get('deviceInfo') and
+                  item.get('deviceInfo').get('categoryName') ==
+                  'Light Sensor'):
+                self.devices.append(VeraSensor(item, self))
+            elif (item.get('deviceInfo') and
+                  item.get('deviceInfo').get('categoryName') ==
                   'Sensor'):
-                sensor = VeraSensor(item, self)
+                sensor = VeraBinarySensor(item, self)
                 self.devices.append(sensor)
                 if sensor.is_armable:
                     armable = VeraArmableDevice(item, self)
@@ -151,9 +157,7 @@ class VeraController(object):
             elif (item.get('deviceInfo') and
                   item.get('deviceInfo').get('categoryName') ==
                   'Door lock'):
-                doorlock = VeraLock(item, self)
-                doorlock.category = 'Doorlock'
-                self.devices.append(doorlock)
+                self.devices.append(VeraLock(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
 
@@ -551,17 +555,11 @@ class VeraArmableDevice(VeraSwitch):
 
 
 class VeraSensor(VeraDevice):
-    """Class to represent a sensor."""
+    """Class to represent a supported sensor."""
 
-    def switch_on(self):
-        """Turn the sensor on."""
-        self.set_value('Target', 1)
-        self.set_cache_value('Status', 1)
 
-    def switch_off(self):
-        """Turn the sensor off."""
-        self.set_value('Target', 0)
-        self.set_cache_value('Status', 0)
+class VeraBinarySensor(VeraDevice):
+    """Class to represent an on / off sensor."""
 
     def is_switched_on(self, refresh=False):
         """Get sensor on off state.
