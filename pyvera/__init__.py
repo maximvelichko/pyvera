@@ -158,6 +158,10 @@ class VeraController(object):
                   item.get('deviceInfo').get('categoryName') ==
                   'Door lock'):
                 self.devices.append(VeraLock(item, self))
+            elif (item.get('deviceInfo') and
+                  item.get('deviceInfo').get('categoryName') ==
+                  'Thermostat'):
+                self.devices.append(VeraThermostat(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
 
@@ -272,6 +276,16 @@ class VeraDevice(object):
             else:
                 self.name = 'Vera Device ' + str(self.device_id)
 
+    def get_payload(self, service_name, name, value):
+        """the http payload for setting a variable"""
+        return {
+            'id': 'lu_action',
+            'output_format': 'json',
+            'DeviceNum': self.device_id,
+            'serviceId': service_name,
+            'action': 'Set' + name,
+            'new' + name + 'Value': value}
+
     def set_value(self, name, value):
         """Set a variable on the vera device.
 
@@ -293,13 +307,7 @@ class VeraDevice(object):
                         'action': 'Set' + name,
                         'newLoadlevelTarget': value}
                 else:
-                    payload = {
-                        'id': 'lu_action',
-                        'output_format': 'json',
-                        'DeviceNum': self.device_id,
-                        'serviceId': service_name,
-                        'action': 'Set' + name,
-                        'new' + name + 'Value': value}
+                    payload = self.get_payload(service_name, name, value)
                 request_url = self.vera_controller.base_url + "/data_request"
                 requests.get(request_url, params=payload)
                 item['value'] = value
@@ -645,3 +653,91 @@ class VeraLock(VeraDevice):
             self.refresh_complex_value('Status')
         val = self.get_complex_value('Status')
         return val == '1'
+
+class VeraThermostat(VeraDevice):
+    """Class to represent a thermostat."""
+    def get_payload(self, service_name, name, value):
+        return {
+            'id': 'lu_action',
+            'output_format': 'json',
+            'DeviceNum': self.device_id,
+            'serviceId': service_name,
+            'action': 'Set' + name,
+            'New' + name: value}
+
+    def set_temperature(self, temp):
+        """Set current goal temperature / setpoint"""
+        self.set_value('CurrentSetpoint', temp)
+        self.set_cache_value('setpoint', temp)
+
+    def get_current_goal_temperature(self, refresh=False):
+        """Get current goal temperature / setpoint"""
+        if refresh:
+            self.refresh()
+        return self.get_value('setpoint')
+
+    def get_current_temperature(self, refresh=False):
+        """Get current temperature"""
+        if refresh:
+            self.refresh()
+        return self.get_value('temperature')
+
+    def set_hvac_mode(self, mode):
+        """Set the hvac mode"""
+        self.set_value('ModeTarget', mode)
+        self.set_cache_value('mode', mode)
+
+    def get_hvac_mode(self, refresh=False):
+        """Get the hvac mode"""
+        if refresh:
+            self.refresh()
+        return self.get_value("mode")
+
+    def turn_off(self):
+        """Set hvac mode to off"""
+        self.set_hvac_mode('Off')
+
+    def turn_cool_on(self):
+        """Set hvac mode to cool"""
+        self.set_hvac_mode('CoolOn')
+
+    def turn_heat_on(self):
+        """Set hvac mode to heat"""
+        self.set_hvac_mode('HeatOn')
+
+    def turn_auto_on(self):
+        """Set hvac mode to auto"""
+        self.set_hvac_mode('AutoChangeOver')
+
+    def set_fan_mode(self, mode):
+        """Set the fan mode"""
+        self.set_value('Mode', mode)
+        self.set_cache_value('fanmode', mode)
+
+    def fan_on(self):
+        """Turn fan on"""
+        self.set_fan_mode('ContinuousOn')
+
+    def fan_off(self):
+        """Turn fan off"""
+        self.set_fan_mode('Off')
+
+    def get_fan_mode(self, refresh=False):
+        """Get fan mode"""
+        if refresh:
+            self.refresh()
+        return self.get_value("fanmode")
+
+    def get_hvac_state(self, refresh=False):
+        """Get current hvac state"""
+        if refresh:
+            self.refresh()
+        return self.get_value("hvacstate")
+
+    def fan_auto(self):
+        """Set fan to automatic"""
+        self.set_fan_mode('Auto')
+
+    def fan_cycle(self):
+        """Set fan to cycle"""
+        self.set_fan_mode('PeriodicOn')
