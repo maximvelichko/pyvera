@@ -263,6 +263,7 @@ class VeraDevice(object):
         self.device_id = self.json_state.get('id')
         self.vera_controller = vera_controller
         self.name = ''
+        
         if self.json_state.get('deviceInfo'):
             self.category = (
                 self.json_state.get('deviceInfo').get('categoryName'))
@@ -278,7 +279,7 @@ class VeraDevice(object):
 
     def get_payload_parameter_name(self, name):
         """the http payload for setting a variable"""
-        return 'New' + name + 'Value'
+        return 'new' + name + 'Value'
 
     def set_value(self, name, value):
         """Set a variable on the vera device.
@@ -478,6 +479,8 @@ class VeraDimmer(VeraSwitch):
     """Class to add dimmer functionality."""
 
     def get_payload_parameter_name(self, name):
+        if name == "LoadLevelTarget": # LoadLevel to Loadlevel, api is case sensitive
+            return "newLoadlevelTarget"
         return "New" + name
 
     def switch_on(self):
@@ -577,6 +580,8 @@ class VeraCurtain(VeraSwitch):
     """Class to add curtains functionality."""
 
     def get_payload_parameter_name(self, name):
+        if name == "LoadLevelTarget": # LoadLevel to Loadlevel, api is case sensitive
+            return "newLoadlevelTarget"
         return "New" + name
 
     def open(self):
