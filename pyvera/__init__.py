@@ -276,15 +276,9 @@ class VeraDevice(object):
             else:
                 self.name = 'Vera Device ' + str(self.device_id)
 
-    def get_payload(self, service_name, name, value):
+    def get_payload_parameter_name(self, name):
         """the http payload for setting a variable"""
-        return {
-            'id': 'lu_action',
-            'output_format': 'json',
-            'DeviceNum': self.device_id,
-            'serviceId': service_name,
-            'action': 'Set' + name,
-            'new' + name + 'Value': value}
+        return 'New' + name + 'Value'
 
     def set_value(self, name, value):
         """Set a variable on the vera device.
@@ -294,22 +288,17 @@ class VeraDevice(object):
         for item in self.json_state.get('states'):
             if item.get('variable') == name:
                 service_name = item.get('service')
-                # The Vera API is very inconsistent so we can't be very
-                # generic here unfortunately
-                if name == 'LoadLevelTarget':
-                    # note the incredibly lame change to the
-                    # last payload parameter
-                    payload = {
-                        'id': 'lu_action',
-                        'output_format': 'json',
-                        'DeviceNum': self.device_id,
-                        'serviceId': service_name,
-                        'action': 'Set' + name,
-                        'newLoadlevelTarget': value}
-                else:
-                    payload = self.get_payload(service_name, name, value)
+                payload = {
+                    'id': 'lu_action',
+                    'output_format': 'json',
+                    'DeviceNum': self.device_id,
+                    'serviceId': service_name,
+                    'action': 'Set' + name
+                }
+                payload.update({self.get_payload_parameter_name(name): value})
                 request_url = self.vera_controller.base_url + "/data_request"
                 requests.get(request_url, params=payload)
+                
                 item['value'] = value
 
     def set_cache_value(self, name, value):
@@ -488,6 +477,9 @@ class VeraSwitch(VeraDevice):
 class VeraDimmer(VeraSwitch):
     """Class to add dimmer functionality."""
 
+    def get_payload_parameter_name(self, name):
+        return "New" + name
+
     def switch_on(self):
         """Turn the dimmer on."""
         self.set_brightness(254)
@@ -584,6 +576,9 @@ class VeraBinarySensor(VeraDevice):
 class VeraCurtain(VeraSwitch):
     """Class to add curtains functionality."""
 
+    def get_payload_parameter_name(self, name):
+        return "New" + name
+
     def open(self):
         """Open the curtains."""
         self.set_level(254)
@@ -655,15 +650,10 @@ class VeraLock(VeraDevice):
         return val == '1'
 
 class VeraThermostat(VeraDevice):
-    """Class to represent a thermostat."""
-    def get_payload(self, service_name, name, value):
-        return {
-            'id': 'lu_action',
-            'output_format': 'json',
-            'DeviceNum': self.device_id,
-            'serviceId': service_name,
-            'action': 'Set' + name,
-            'New' + name: value}
+    """Class to represent a thermostat."""    
+
+    def get_payload_parameter_name(self, name):
+        return "New" + name
 
     def set_temperature(self, temp):
         """Set current goal temperature / setpoint"""
