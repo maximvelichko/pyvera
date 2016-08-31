@@ -299,7 +299,6 @@ class VeraDevice(object):
                 payload.update({self.get_payload_parameter_name(name): value})
                 request_url = self.vera_controller.base_url + "/data_request"
                 requests.get(request_url, params=payload)
-                
                 item['value'] = value
 
     def set_cache_value(self, name, value):
@@ -481,7 +480,7 @@ class VeraDimmer(VeraSwitch):
     def get_payload_parameter_name(self, name):
         if name == "LoadLevelTarget": # LoadLevel to Loadlevel, api is case sensitive
             return "newLoadlevelTarget"
-        return "New" + name
+        return super(VeraDimmer, self).get_payload_parameter_name(name)
 
     def switch_on(self):
         """Turn the dimmer on."""
@@ -582,7 +581,7 @@ class VeraCurtain(VeraSwitch):
     def get_payload_parameter_name(self, name):
         if name == "LoadLevelTarget": # LoadLevel to Loadlevel, api is case sensitive
             return "newLoadlevelTarget"
-        return "New" + name
+        return super(VeraCurtain, self).get_payload_parameter_name(name)
 
     def open(self):
         """Open the curtains."""
