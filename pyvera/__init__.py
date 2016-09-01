@@ -158,6 +158,10 @@ class VeraController(object):
                   item.get('deviceInfo').get('categoryName') ==
                   'Door lock'):
                 self.devices.append(VeraLock(item, self))
+            elif (item.get('deviceInfo') and
+                  item.get('deviceInfo').get('categoryName') ==
+                  'Thermostat'):
+                self.devices.append(VeraThermostat(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
 
@@ -259,6 +263,7 @@ class VeraDevice(object):
         self.device_id = self.json_state.get('id')
         self.vera_controller = vera_controller
         self.name = ''
+        
         if self.json_state.get('deviceInfo'):
             self.category = (
                 self.json_state.get('deviceInfo').get('categoryName'))
@@ -272,6 +277,10 @@ class VeraDevice(object):
             else:
                 self.name = 'Vera Device ' + str(self.device_id)
 
+    def get_payload_parameter_name(self, name):
+        """the http payload for setting a variable"""
+        return 'new' + name + 'Value'
+
     def set_value(self, name, value):
         """Set a variable on the vera device.
 
@@ -280,26 +289,14 @@ class VeraDevice(object):
         for item in self.json_state.get('states'):
             if item.get('variable') == name:
                 service_name = item.get('service')
-                # The Vera API is very inconsistent so we can't be very
-                # generic here unfortunately
-                if name == 'LoadLevelTarget':
-                    # note the incredibly lame change to the
-                    # last payload parameter
-                    payload = {
-                        'id': 'lu_action',
-                        'output_format': 'json',
-                        'DeviceNum': self.device_id,
-                        'serviceId': service_name,
-                        'action': 'Set' + name,
-                        'newLoadlevelTarget': value}
-                else:
-                    payload = {
-                        'id': 'lu_action',
-                        'output_format': 'json',
-                        'DeviceNum': self.device_id,
-                        'serviceId': service_name,
-                        'action': 'Set' + name,
-                        'new' + name + 'Value': value}
+                payload = {
+                    'id': 'lu_action',
+                    'output_format': 'json',
+                    'DeviceNum': self.device_id,
+                    'serviceId': service_name,
+                    'action': 'Set' + name
+                }
+                payload.update({self.get_payload_parameter_name(name): value})
                 request_url = self.vera_controller.base_url + "/data_request"
                 requests.get(request_url, params=payload)
                 item['value'] = value
@@ -480,6 +477,11 @@ class VeraSwitch(VeraDevice):
 class VeraDimmer(VeraSwitch):
     """Class to add dimmer functionality."""
 
+    def get_payload_parameter_name(self, name):
+        if name == "LoadLevelTarget": # LoadLevel to Loadlevel, api is case sensitive
+            return "newLoadlevelTarget"
+        return super(VeraDimmer, self).get_payload_parameter_name(name)
+
     def switch_on(self):
         """Turn the dimmer on."""
         self.set_brightness(254)
@@ -576,6 +578,11 @@ class VeraBinarySensor(VeraDevice):
 class VeraCurtain(VeraSwitch):
     """Class to add curtains functionality."""
 
+    def get_payload_parameter_name(self, name):
+        if name == "LoadLevelTarget": # LoadLevel to Loadlevel, api is case sensitive
+            return "newLoadlevelTarget"
+        return super(VeraCurtain, self).get_payload_parameter_name(name)
+
     def open(self):
         """Open the curtains."""
         self.set_level(254)
@@ -645,3 +652,86 @@ class VeraLock(VeraDevice):
             self.refresh_complex_value('Status')
         val = self.get_complex_value('Status')
         return val == '1'
+
+class VeraThermostat(VeraDevice):
+    """Class to represent a thermostat."""    
+
+    def get_payload_parameter_name(self, name):
+        return "New" + name
+
+    def set_temperature(self, temp):
+        """Set current goal temperature / setpoint"""
+        self.set_value('CurrentSetpoint', temp)
+        self.set_cache_value('setpoint', temp)
+
+    def get_current_goal_temperature(self, refresh=False):
+        """Get current goal temperature / setpoint"""
+        if refresh:
+            self.refresh()
+        return self.get_value('setpoint')
+
+    def get_current_temperature(self, refresh=False):
+        """Get current temperature"""
+        if refresh:
+            self.refresh()
+        return self.get_value('temperature')
+
+    def set_hvac_mode(self, mode):
+        """Set the hvac mode"""
+        self.set_value('ModeTarget', mode)
+        self.set_cache_value('mode', mode)
+
+    def get_hvac_mode(self, refresh=False):
+        """Get the hvac mode"""
+        if refresh:
+            self.refresh()
+        return self.get_value("mode")
+
+    def turn_off(self):
+        """Set hvac mode to off"""
+        self.set_hvac_mode('Off')
+
+    def turn_cool_on(self):
+        """Set hvac mode to cool"""
+        self.set_hvac_mode('CoolOn')
+
+    def turn_heat_on(self):
+        """Set hvac mode to heat"""
+        self.set_hvac_mode('HeatOn')
+
+    def turn_auto_on(self):
+        """Set hvac mode to auto"""
+        self.set_hvac_mode('AutoChangeOver')
+
+    def set_fan_mode(self, mode):
+        """Set the fan mode"""
+        self.set_value('Mode', mode)
+        self.set_cache_value('fanmode', mode)
+
+    def fan_on(self):
+        """Turn fan on"""
+        self.set_fan_mode('ContinuousOn')
+
+    def fan_off(self):
+        """Turn fan off"""
+        self.set_fan_mode('Off')
+
+    def get_fan_mode(self, refresh=False):
+        """Get fan mode"""
+        if refresh:
+            self.refresh()
+        return self.get_value("fanmode")
+
+    def get_hvac_state(self, refresh=False):
+        """Get current hvac state"""
+        if refresh:
+            self.refresh()
+        return self.get_value("hvacstate")
+
+    def fan_auto(self):
+        """Set fan to automatic"""
+        self.set_fan_mode('Auto')
+
+    def fan_cycle(self):
+        """Set fan to cycle"""
+        self.set_fan_mode('PeriodicOn')
