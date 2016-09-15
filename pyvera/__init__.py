@@ -20,8 +20,6 @@ _VERA_CONTROLLER = None
 
 LOG = logging.getLogger(__name__)
 
-WIN_COVERING_SERVICE = 'urn:upnp-org:serviceId:WindowCovering1'
-
 def init_controller(url):
     """Initialize a controller.
 
