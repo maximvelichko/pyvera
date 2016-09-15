@@ -20,7 +20,6 @@ _VERA_CONTROLLER = None
 
 LOG = logging.getLogger(__name__)
 
-
 def init_controller(url):
     """Initialize a controller.
 
@@ -305,6 +304,21 @@ class VeraDevice(object):
                 requests.get(request_url, params=payload)
                 item['value'] = value
 
+    def call_service(self, service_name, action):
+        """Call a Vera service.
+
+        This will call the Vera api to change device state.
+        """
+        payload = {
+            'id': 'action',
+            'output_format': 'json',
+            'DeviceNum': self.device_id,
+            'serviceId': service_name,
+            'action': action
+        }
+        request_url = self.vera_controller.base_url + "/data_request"
+        requests.get(request_url, params=payload)
+
     def set_cache_value(self, name, value):
         """Set a variable in the local state dictionary.
 
@@ -582,6 +596,11 @@ class VeraBinarySensor(VeraDevice):
 class VeraCurtain(VeraSwitch):
     """Class to add curtains functionality."""
 
+    @property
+    def window_covering_service(self):
+        """Vera service string for window covering service."""
+        return 'urn:upnp-org:serviceId:WindowCovering1'
+
     def get_payload_parameter_name(self, name):
         if name == "LoadLevelTarget": # LoadLevel to Loadlevel, api is case sensitive
             return "newLoadlevelTarget"
@@ -589,11 +608,21 @@ class VeraCurtain(VeraSwitch):
 
     def open(self):
         """Open the curtains."""
-        self.set_level(100)
+        self.call_service(
+            self.window_covering_service,
+            'Up')
 
     def close(self):
         """Close the curtains."""
-        self.set_level(0)
+        self.call_service(
+            self.window_covering_service,
+            'Down')
+
+    def stop(self):
+        """Open the curtains."""
+        self.call_service(
+            self.window_covering_service,
+            'Stop')
 
     def is_open(self, refresh=False):
         """Get curtains state.
@@ -624,7 +653,6 @@ class VeraCurtain(VeraSwitch):
         """
         self.set_value('LoadLevelTarget', level)
         self.set_cache_value('level', level)
-
 
 class VeraLock(VeraDevice):
     """Class to represent a door lock."""
