@@ -610,29 +610,20 @@ class VeraCurtain(VeraSwitch):
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
         Refresh is only needed if you're not using subscriptions.
-        Converts the Vera level property for curtains from a percentage to the
-        0 - 255 scale used by HA.
+        Scale is 0-100
         """
         if refresh:
             self.refresh()
-        value = 0
         level = self.get_value('level')
-        percent = 0 if level is None else int(level)
-        if percent > 0:
-            value = round(percent * 2.55)
-        return int(value)
+        return 0 if level is None else int(level)
 
     def set_level(self, level):
         """Set open level of the curtains.
 
-        Converts the Vera level property for curtains from a percentage to the
-        0 - 255 scale used by HA.
+        Scale is 0-100
         """
-        percent = 0
-        if level > 0:
-            percent = round(level / 2.55)
-        self.set_value('LoadLevelTarget', percent)
-        self.set_cache_value('level', percent)
+        self.set_value('LoadLevelTarget', level)
+        self.set_cache_value('level', level)
 
 
 class VeraLock(VeraDevice):
