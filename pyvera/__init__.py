@@ -152,6 +152,10 @@ class VeraController(object):
                 self.devices.append(VeraCurtain(item, self))
             elif (item.get('deviceInfo') and
                   item.get('deviceInfo').get('categoryName') ==
+                  'Window covering'):
+                self.devices.append(VeraCurtain(item, self))
+            elif (item.get('deviceInfo') and
+                  item.get('deviceInfo').get('categoryName') ==
                   'Doorlock'):
                 self.devices.append(VeraLock(item, self))
             elif (item.get('deviceInfo') and
@@ -263,7 +267,7 @@ class VeraDevice(object):
         self.device_id = self.json_state.get('id')
         self.vera_controller = vera_controller
         self.name = ''
-        
+
         if self.json_state.get('deviceInfo'):
             self.category = (
                 self.json_state.get('deviceInfo').get('categoryName'))
@@ -654,7 +658,7 @@ class VeraLock(VeraDevice):
         return val == '1'
 
 class VeraThermostat(VeraDevice):
-    """Class to represent a thermostat."""    
+    """Class to represent a thermostat."""
 
     def get_payload_parameter_name(self, name):
         return "New" + name
