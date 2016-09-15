@@ -589,7 +589,7 @@ class VeraCurtain(VeraSwitch):
 
     def open(self):
         """Open the curtains."""
-        self.set_level(254)
+        self.set_level(100)
 
     def close(self):
         """Close the curtains."""
