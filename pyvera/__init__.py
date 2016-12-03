@@ -288,6 +288,20 @@ class VeraDevice(object):
         """the http payload for setting a variable"""
         return 'new' + name + 'Value'
 
+    def lu_action(self, action, service, payload):
+        """Perfom a lu_action."""
+        request_payload = {
+            'id': 'lu_action',
+            'output_format': 'json',
+            'DeviceNum': self.device_id,
+            'serviceId': 'urn:upnp-org:serviceId:' + service,
+            'action': action
+        }
+        request_payload.update(payload)
+        request_url = self.vera_controller.base_url + "/data_request"
+        requests.get(request_url, timeout=TIMEOUT, params=request_payload)
+        return request_payload
+
     def set_value(self, name, value):
         """Set a variable on the vera device.
 
@@ -706,7 +720,9 @@ class VeraThermostat(VeraDevice):
 
     def set_hvac_mode(self, mode):
         """Set the hvac mode"""
-        self.set_value('ModeTarget', mode)
+        self.lu_action('SetModeTarget', 'HVAC_UserOperatingMode1', {
+            'NewModeTarget': mode
+        })
         self.set_cache_value('mode', mode)
 
     def get_hvac_mode(self, refresh=False):
