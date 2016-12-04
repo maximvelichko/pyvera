@@ -698,36 +698,6 @@ class VeraThermostat(VeraDevice):
             self.refresh()
         return self.get_value('setpoint')
 
-    def get_current_heat_setpoint(self, refresh=False):
-        """Get current heat setpoint"""
-        if refresh:
-            self.refresh_complex_value('AllSetpoints')
-        try:
-            setpoints = self.get_complex_value('AllSetpoints')
-            return float(str.split(setpoints,',')[0])
-        except ValueError:
-            return None
-
-    def get_current_cool_setpoint(self, refresh=False):
-        """Get current cool setpoint"""
-        if refresh:
-            self.refresh_complex_value('AllSetpoints')
-        try:
-            setpoints = self.get_complex_value('AllSetpoints')
-            return float(str.split(setpoints,',')[1])
-        except ValueError:
-            return None
-
-    def get_current_auto_setpoint(self, refresh=False):
-        """Get current auto setpoint"""
-        if refresh:
-            self.refresh_complex_value('AllSetpoints')
-        try:
-            setpoints = self.get_complex_value('AllSetpoints')
-            return float(str.split(setpoints,',')[2])
-        except ValueError:
-            return None
-
     def get_current_temperature(self, refresh=False):
         """Get current temperature"""
         if refresh:
