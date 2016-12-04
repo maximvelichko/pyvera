@@ -288,19 +288,19 @@ class VeraDevice(object):
         """the http payload for setting a variable"""
         return 'new' + name + 'Value'
 
-    def lu_action(self, action, service, payload):
-        """Perfom a lu_action."""
+    def action(self, request_id, action, service, payload):
+        """Perfom a data_request action."""
         request_payload = {
-            'id': 'lu_action',
+            'id': request_id,
             'output_format': 'json',
             'DeviceNum': self.device_id,
-            'serviceId': 'urn:upnp-org:serviceId:' + service,
+            'serviceId': service,
             'action': action
         }
         request_payload.update(payload)
         request_url = self.vera_controller.base_url + "/data_request"
-        requests.get(request_url, timeout=TIMEOUT, params=request_payload)
-        return request_payload
+        return requests.get(request_url, timeout=TIMEOUT,
+                            params=request_payload)
 
     def set_value(self, name, value):
         """Set a variable on the vera device.
@@ -310,16 +310,10 @@ class VeraDevice(object):
         for item in self.json_state.get('states'):
             if item.get('variable') == name:
                 service_name = item.get('service')
-                payload = {
-                    'id': 'lu_action',
-                    'output_format': 'json',
-                    'DeviceNum': self.device_id,
-                    'serviceId': service_name,
-                    'action': 'Set' + name
-                }
-                payload.update({self.get_payload_parameter_name(name): value})
-                request_url = self.vera_controller.base_url + "/data_request"
-                requests.get(request_url, timeout=TIMEOUT, params=payload)
+
+                self.action('lu_action', 'Set' + name, service_name, {
+                    self.get_payload_parameter_name(name): value
+                })
                 item['value'] = value
 
     def call_service(self, service_name, action):
@@ -327,15 +321,7 @@ class VeraDevice(object):
 
         This will call the Vera api to change device state.
         """
-        payload = {
-            'id': 'action',
-            'output_format': 'json',
-            'DeviceNum': self.device_id,
-            'serviceId': service_name,
-            'action': action
-        }
-        request_url = self.vera_controller.base_url + "/data_request"
-        requests.get(request_url, timeout=TIMEOUT, params=payload)
+        return self.action('action', service_name, action, {})
 
     def set_cache_value(self, name, value):
         """Set a variable in the local state dictionary.
@@ -750,9 +736,12 @@ class VeraThermostat(VeraDevice):
 
     def set_hvac_mode(self, mode):
         """Set the hvac mode"""
-        self.lu_action('SetModeTarget', 'HVAC_UserOperatingMode1', {
-            'NewModeTarget': mode
-        })
+        self.action(
+            'lu_action',
+            'SetModeTarget',
+            'urn:upnp-org:serviceId:HVAC_UserOperatingMode1', {
+                'NewModeTarget': mode
+            })
         self.set_cache_value('mode', mode)
 
     def get_hvac_mode(self, refresh=False):
