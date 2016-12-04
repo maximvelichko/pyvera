@@ -1,0 +1,3 @@
+#!/bin/bash
+./script/bootstrap
+docker run -it --rm -v $(pwd):/repo --name pyvera-lint pyvera pylint pyvera

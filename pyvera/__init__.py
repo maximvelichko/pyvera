@@ -261,7 +261,7 @@ class VeraController(object):
         self.subscription_registry.register(device, callback)
 
 
-class VeraDevice(object):
+class VeraDevice(object): # pylint: disable=R0904
     """Class to represent each vera device."""
 
     def __init__(self, json_obj, vera_controller):
@@ -284,7 +284,8 @@ class VeraDevice(object):
             else:
                 self.name = 'Vera Device ' + str(self.device_id)
 
-    def get_payload_parameter_name(self, name):
+    @staticmethod
+    def get_payload_parameter_name(name):
         """the http payload for setting a variable"""
         return 'new' + name + 'Value'
 
