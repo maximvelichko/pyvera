@@ -309,12 +309,12 @@ class VeraDevice(object): # pylint: disable=R0904
         """
         for item in self.json_state.get('states'):
             if item.get('variable') == name:
-                service_name = item.get('service')
+                service_id = item.get('service')
 
                 payload = {
                     'id': 'lu_action',
                     'action': 'Set' + name,
-                    'service': service_name,
+                    'serviceId': service_id,
                     self.get_payload_parameter_name(name): value
                 }
                 result = self.data_request(**payload)
@@ -323,12 +323,12 @@ class VeraDevice(object): # pylint: disable=R0904
 
                 item['value'] = value
 
-    def call_service(self, service_name, action):
+    def call_service(self, service_id, action):
         """Call a Vera service.
 
         This will call the Vera api to change device state.
         """
-        return self.data_request(id='action', service=service_name,
+        return self.data_request(id='action', serviceId=service_id,
                                  action=action)
 
     def set_cache_value(self, name, value):
@@ -375,12 +375,12 @@ class VeraDevice(object): # pylint: disable=R0904
         """
         for item in self.json_state.get('states'):
             if item.get('variable') == name:
-                service_name = item.get('service')
+                service_id = item.get('service')
                 result = self.data_request(**{
                     'id': 'variableget',
                     'output_format': 'json',
                     'DeviceNum': self.device_id,
-                    'serviceId': service_name,
+                    'serviceId': service_id,
                     'Variable': name
                 })
                 item['value'] = result.text
@@ -713,7 +713,7 @@ class VeraThermostat(VeraDevice):
         self.data_request(**{
             'id': 'lu_action',
             'action': 'SetModeTarget',
-            'service': 'urn:upnp-org:serviceId:HVAC_UserOperatingMode1',
+            'serviceId': 'urn:upnp-org:serviceId:HVAC_UserOperatingMode1',
             'NewModeTarget': mode
         })
         self.set_cache_value('mode', mode)
