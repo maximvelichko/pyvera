@@ -120,6 +120,10 @@ class VeraController(object):
                 self.devices.append(VeraSwitch(item, self))
             elif (item.get('deviceInfo') and
                   item.get('deviceInfo').get('categoryName') ==
+                  'Siren'):
+                self.devices.append(VeraSiren(item, self))
+            elif (item.get('deviceInfo') and
+                  item.get('deviceInfo').get('categoryName') ==
                   'Dimmable Switch'):
                 self.devices.append(VeraDimmer(item, self))
             elif (item.get('deviceInfo') and
@@ -500,6 +504,8 @@ class VeraSwitch(VeraDevice):
         val = self.get_value('Status')
         return val == '1'
 
+class VeraSiren(VeraSwitch):
+    """Class to represent a siren that can be switched on/off."""
 
 class VeraDimmer(VeraSwitch):
     """Class to add dimmer functionality."""
