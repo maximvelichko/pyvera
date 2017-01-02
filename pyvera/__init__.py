@@ -287,8 +287,8 @@ class VeraDevice(object): # pylint: disable=R0904
             else:
                 self.name = 'Vera Device ' + str(self.device_id)
 
-    @staticmethod
-    def get_payload_parameter_name(name):
+    # pylint: disable=R0201
+    def get_payload_parameter_name(self, name):
         """the http payload for setting a variable"""
         return 'new' + name + 'Value'
 
