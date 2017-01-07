@@ -308,9 +308,13 @@ class VeraDevice(object): # pylint: disable=R0904
         This will call the Vera api to change device state.
         """
         for item in self.json_state.get('states'):
-            if item.get('variable') == name:
+            if ((item.get('variable') == name) or (name == 'Target' and item.get('service') == 'upnp-rfxcom-com:serviceId:rfxtrx1')):
                 service_id = item.get('service')
-
+                """ Fix for RFXtrx devices in vera since they are missing the
+                variable Target with correct service.
+                """"
+                if (service_name == 'upnp-rfxcom-com:serviceId:rfxtrx1'):
+                    service_name = 'urn:upnp-org:serviceId:SwitchPower1'
                 payload = {
                     'id': 'lu_action',
                     'action': 'Set' + name,
