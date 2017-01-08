@@ -22,6 +22,7 @@ _VERA_CONTROLLER = None
 
 LOG = logging.getLogger(__name__)
 
+
 def init_controller(url):
     """Initialize a controller.
 
@@ -110,67 +111,41 @@ class VeraController(object):
 
         for item in items:
             item['deviceInfo'] = self.device_id_map.get(item.get('id'))
-            if (item.get('deviceInfo') and
-                    item.get('deviceInfo').get('categoryName') ==
-                    'Switch'):
-                self.devices.append(VeraSwitch(item, self))
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'On/Off Switch'):
-                self.devices.append(VeraSwitch(item, self))
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'Dimmable Switch'):
-                self.devices.append(VeraDimmer(item, self))
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'Dimmable Light'):
-                self.devices.append(VeraDimmer(item, self))
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'Temperature Sensor'):
-                self.devices.append(VeraSensor(item, self))
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'Humidity Sensor'):
-                self.devices.append(VeraSensor(item, self))
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'Light Sensor'):
-                self.devices.append(VeraSensor(item, self))
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'Sensor'):
-                sensor = VeraBinarySensor(item, self)
-                self.devices.append(sensor)
-                if sensor.is_armable:
-                    armable = VeraArmableDevice(item, self)
-                    armable.category = 'Armable Sensor'
-                    self.devices.append(armable)
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'Light Sensor'):
-                self.devices.append(VeraSensor(item, self))
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'Window Covering'):
-                self.devices.append(VeraCurtain(item, self))
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'Window covering'):
-                self.devices.append(VeraCurtain(item, self))
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'Doorlock'):
-                self.devices.append(VeraLock(item, self))
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'Door lock'):
-                self.devices.append(VeraLock(item, self))
-            elif (item.get('deviceInfo') and
-                  item.get('deviceInfo').get('categoryName') ==
-                  'Thermostat'):
-                self.devices.append(VeraThermostat(item, self))
+            if item.get('deviceInfo'):
+                device_category = item.get('deviceInfo').get('categoryName')
+                if device_category == 'Switch':
+                    self.devices.append(VeraSwitch(item, self))
+                elif device_category == 'On/Off Switch':
+                    self.devices.append(VeraSwitch(item, self))
+                elif device_category == 'Dimmable Switch':
+                    self.devices.append(VeraDimmer(item, self))
+                elif device_category == 'Dimmable Light':
+                    self.devices.append(VeraDimmer(item, self))
+                elif device_category == 'Temperature Sensor':
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == 'Humidity Sensor':
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == 'Light Sensor':
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == 'Sensor':
+                    sensor = VeraBinarySensor(item, self)
+                    self.devices.append(sensor)
+                    if sensor.is_armable:
+                        armable = VeraArmableDevice(item, self)
+                        armable.category = 'Armable Sensor'
+                        self.devices.append(armable)
+                elif device_category == 'Light Sensor':
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == 'Window Covering':
+                    self.devices.append(VeraCurtain(item, self))
+                elif device_category == 'Window covering':
+                    self.devices.append(VeraCurtain(item, self))
+                elif device_category == 'Doorlock':
+                    self.devices.append(VeraLock(item, self))
+                elif device_category == 'Door lock':
+                    self.devices.append(VeraLock(item, self))
+                elif device_category == 'Thermostat':
+                    self.devices.append(VeraThermostat(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
 
@@ -264,8 +239,8 @@ class VeraController(object):
         self.subscription_registry.register(device, callback)
 
 
-class VeraDevice(object): # pylint: disable=R0904
-    """Class to represent each vera device."""
+class VeraDevice(object):  # pylint: disable=R0904
+    """ Class to represent each vera device."""
 
     def __init__(self, json_obj, vera_controller):
         """Setup a Vera device."""
@@ -345,7 +320,8 @@ class VeraDevice(object): # pylint: disable=R0904
         for item in self.json_state.get('states'):
             if item.get('variable') == name:
                 service_id = item.get('service')
-                LOG.debug("Set variable: %s using service_id: %s", name, service_id)
+                LOG.debug("Set variable: %s using service_id: %s", name,
+                          service_id)
                 payload = {
                     'id': 'lu_action',
                     'action': 'Set' + name,
@@ -353,7 +329,8 @@ class VeraDevice(object): # pylint: disable=R0904
                     self.get_payload_parameter_name(name): value
                 }
                 result = self.data_request(**payload)
-                LOG.debug("Result of data_request with payload %s: %s", payload,
+                LOG.debug("Result of data_request with payload %s: %s",
+                          payload,
                           result.text)
 
                 item['value'] = value
@@ -535,7 +512,7 @@ class VeraSwitch(VeraDevice):
             self.switch_service,
             'Target',
             'newTargetValue',
-             state)
+            state)
         self.set_cache_value('Status', state)
 
     def switch_on(self):
@@ -560,7 +537,6 @@ class VeraSwitch(VeraDevice):
 
 class VeraDimmer(VeraSwitch):
     """Class to add dimmer functionality."""
-
 
     def switch_on(self):
         """Turn the dimmer on."""
@@ -612,7 +588,7 @@ class VeraDimmer(VeraSwitch):
             self.dimmer_service,
             'LoadLevelTarget',
             'newLoadlevelTarget',
-             percent)
+            percent)
         self.set_cache_value('level', percent)
 
 
@@ -625,7 +601,7 @@ class VeraArmableDevice(VeraSwitch):
             self.security_sensor_service,
             'Armed',
             'newArmedValue',
-             state)
+            state)
         self.set_cache_value('Armed', state)
 
     def switch_on(self):
@@ -719,9 +695,10 @@ class VeraCurtain(VeraSwitch):
             self.dimmer_service,
             'LoadLevelTarget',
             'newLoadlevelTarget',
-             level)
+            level)
 
         self.set_cache_value('level', level)
+
 
 class VeraLock(VeraDevice):
     """Class to represent a door lock."""
@@ -732,7 +709,7 @@ class VeraLock(VeraDevice):
             self.lock_service,
             'Target',
             'newTargetValue',
-             state)
+            state)
 
     def lock(self):
         """Lock the door."""
@@ -752,6 +729,7 @@ class VeraLock(VeraDevice):
             self.refresh_complex_value('Status')
         val = self.get_complex_value('Status')
         return val == '1'
+
 
 class VeraThermostat(VeraDevice):
     """Class to represent a thermostat."""
@@ -782,7 +760,7 @@ class VeraThermostat(VeraDevice):
             self.thermostat_operating_service,
             'SetModeTarget',
             'NewModeTarget',
-             mode)
+            mode)
         self.set_cache_value('mode', mode)
 
     def get_hvac_mode(self, refresh=False):
@@ -813,7 +791,7 @@ class VeraThermostat(VeraDevice):
             self.thermostat_fan_service,
             'SetModeTarget',
             'NewModeTarget',
-             mode)
+            mode)
         self.set_cache_value('fanmode', mode)
 
     def fan_on(self):
