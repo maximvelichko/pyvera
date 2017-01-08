@@ -287,6 +287,41 @@ class VeraDevice(object): # pylint: disable=R0904
             else:
                 self.name = 'Vera Device ' + str(self.device_id)
 
+    @property
+    def switch_service(self):
+        """Vera service string for switch."""
+        return 'urn:upnp-org:serviceId:SwitchPower1'
+
+    @property
+    def dimmer_service(self):
+        """Vera service string for dimmer."""
+        return 'urn:upnp-org:serviceId:Dimming1'
+
+    @property
+    def security_sensor_service(self):
+        """Vera service string for armable sensors."""
+        return 'urn:micasaverde-com:serviceId:SecuritySensor1'
+
+    @property
+    def window_covering_service(self):
+        """Vera service string for window covering service."""
+        return 'urn:upnp-org:serviceId:WindowCovering1'
+
+    @property
+    def lock_service(self):
+        """Vera service string for lock service."""
+        return 'urn:micasaverde-com:serviceId:DoorLock1'
+
+    @property
+    def thermostat_operating_service(self):
+        """Vera service string HVAC operating mode."""
+        return 'urn:upnp-org:serviceId:HVAC_UserOperatingMode1',
+
+    @property
+    def thermostat_fan_service(self):
+        """Vera service string HVAC fan operating mode."""
+        return 'urn:upnp-org:serviceId:HVAC_FanOperatingMode1'
+
     # pylint: disable=R0201
     def get_payload_parameter_name(self, name):
         """the http payload for setting a variable"""
@@ -310,7 +345,7 @@ class VeraDevice(object): # pylint: disable=R0904
         for item in self.json_state.get('states'):
             if item.get('variable') == name:
                 service_id = item.get('service')
-
+                LOG.debug("Set variable: %s using service_id: %s", name, service_id)
                 payload = {
                     'id': 'lu_action',
                     'action': 'Set' + name,
@@ -322,6 +357,21 @@ class VeraDevice(object): # pylint: disable=R0904
                           result.text)
 
                 item['value'] = value
+
+    def set_service_value(self, service_id, set_name, parameter_name, value):
+        """Set a variable on the vera device.
+
+        This will call the Vera api to change device state.
+        """
+        payload = {
+            'id': 'lu_action',
+            'action': 'Set' + set_name,
+            'serviceId': service_id,
+            parameter_name: value
+        }
+        result = self.data_request(**payload)
+        LOG.debug("Result of data_request with payload %s: %s", payload,
+                  result.text)
 
     def call_service(self, service_id, action):
         """Call a Vera service.
@@ -479,15 +529,22 @@ class VeraDevice(object): # pylint: disable=R0904
 class VeraSwitch(VeraDevice):
     """Class to add switch functionality."""
 
+    def set_switch_state(self, state):
+        """Set the switch state, also update local state."""
+        self.set_service_value(
+            self.switch_service,
+            'Target',
+            'newTargetValue',
+             state)
+        self.set_cache_value('Status', state)
+
     def switch_on(self):
         """Turn the switch on, also update local state."""
-        self.set_value('Target', 1)
-        self.set_cache_value('Status', 1)
+        self.set_switch_state(1)
 
     def switch_off(self):
         """Turn the switch off, also update local state."""
-        self.set_value('Target', 0)
-        self.set_cache_value('Status', 0)
+        self.set_switch_state(0)
 
     def is_switched_on(self, refresh=False):
         """Get switch state.
@@ -504,10 +561,6 @@ class VeraSwitch(VeraDevice):
 class VeraDimmer(VeraSwitch):
     """Class to add dimmer functionality."""
 
-    def get_payload_parameter_name(self, name):
-        if name == "LoadLevelTarget": # LoadLevel to Loadlevel, api is case sensitive
-            return "newLoadlevelTarget"
-        return super(VeraDimmer, self).get_payload_parameter_name(name)
 
     def switch_on(self):
         """Turn the dimmer on."""
@@ -554,22 +607,34 @@ class VeraDimmer(VeraSwitch):
         percent = 0
         if brightness > 0:
             percent = round(brightness / 2.55)
-        self.set_value('LoadLevelTarget', percent)
+
+        self.set_service_value(
+            self.dimmer_service,
+            'LoadLevelTarget',
+            'newLoadlevelTarget',
+             percent)
         self.set_cache_value('level', percent)
 
 
 class VeraArmableDevice(VeraSwitch):
     """Class to represent a device that can be armed."""
 
+    def set_armed_state(self, state):
+        """Set the armed state, also update local state."""
+        self.set_service_value(
+            self.security_sensor_service,
+            'Armed',
+            'newArmedValue',
+             state)
+        self.set_cache_value('Armed', state)
+
     def switch_on(self):
         """Arm the device."""
-        self.set_value('Armed', 1)
-        self.set_cache_value('Armed', 1)
+        self.set_armed_state(1)
 
     def switch_off(self):
         """Disarm the device."""
-        self.set_value('Armed', 0)
-        self.set_cache_value('Armed', 0)
+        self.set_armed_state(0)
 
     def is_switched_on(self, refresh=False):
         """Get armed state.
@@ -604,16 +669,6 @@ class VeraBinarySensor(VeraDevice):
 
 class VeraCurtain(VeraSwitch):
     """Class to add curtains functionality."""
-
-    @property
-    def window_covering_service(self):
-        """Vera service string for window covering service."""
-        return 'urn:upnp-org:serviceId:WindowCovering1'
-
-    def get_payload_parameter_name(self, name):
-        if name == "LoadLevelTarget": # LoadLevel to Loadlevel, api is case sensitive
-            return "newLoadlevelTarget"
-        return super(VeraCurtain, self).get_payload_parameter_name(name)
 
     def open(self):
         """Open the curtains."""
@@ -660,19 +715,32 @@ class VeraCurtain(VeraSwitch):
 
         Scale is 0-100
         """
-        self.set_value('LoadLevelTarget', level)
+        self.set_service_value(
+            self.dimmer_service,
+            'LoadLevelTarget',
+            'newLoadlevelTarget',
+             level)
+
         self.set_cache_value('level', level)
 
 class VeraLock(VeraDevice):
     """Class to represent a door lock."""
 
+    def set_lock_state(self, state):
+        """Set the lock state, also update local state."""
+        self.set_service_value(
+            self.lock_service,
+            'Target',
+            'newTargetValue',
+             state)
+
     def lock(self):
         """Lock the door."""
-        self.set_value('Target', 1)
+        self.set_lock_state(1)
 
     def unlock(self):
         """Unlock the device."""
-        self.set_value('Target', 0)
+        self.set_lock_state(0)
 
     def is_locked(self, refresh=False):
         """Get locked state.
@@ -710,12 +778,11 @@ class VeraThermostat(VeraDevice):
 
     def set_hvac_mode(self, mode):
         """Set the hvac mode"""
-        self.data_request(**{
-            'id': 'lu_action',
-            'action': 'SetModeTarget',
-            'serviceId': 'urn:upnp-org:serviceId:HVAC_UserOperatingMode1',
-            'NewModeTarget': mode
-        })
+        self.set_service_value(
+            self.thermostat_operating_service,
+            'SetModeTarget',
+            'NewModeTarget',
+             mode)
         self.set_cache_value('mode', mode)
 
     def get_hvac_mode(self, refresh=False):
@@ -742,7 +809,11 @@ class VeraThermostat(VeraDevice):
 
     def set_fan_mode(self, mode):
         """Set the fan mode"""
-        self.set_value('Mode', mode)
+        self.set_service_value(
+            self.thermostat_fan_service,
+            'SetModeTarget',
+            'NewModeTarget',
+             mode)
         self.set_cache_value('fanmode', mode)
 
     def fan_on(self):
