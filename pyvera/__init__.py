@@ -66,16 +66,14 @@ class VeraController(object):
         self.categories = {}
         self.device_id_map = {}
 
-    def data_request(self, **kwargs):
+    def data_request(self, payload, timeout=TIMEOUT):
         """Perform a data_request and return the result."""
-        payload = dict(kwargs)
-        timeout = payload.pop('timeout', TIMEOUT)
         request_url = self.base_url + "/data_request"
         return requests.get(request_url, timeout=timeout, params=payload)
 
     def get_simple_devices_info(self):
         """Get basic device info from Vera."""
-        j = self.data_request(id='sdata').json()
+        j = self.data_request({'id': 'sdata'}).json()
 
         if j.get('temperature'):
             self.temperature_units = j.get('temperature')
@@ -104,7 +102,7 @@ class VeraController(object):
         # all the info e need
         self.get_simple_devices_info()
 
-        j = self.data_request(id='status', output_format='json').json()
+        j = self.data_request({'id': 'status', 'output_format': 'json'}).json()
 
         self.devices = []
         items = j.get('devices')
@@ -161,7 +159,7 @@ class VeraController(object):
 
     def refresh_data(self):
         """Refresh data from Vera device."""
-        j = self.data_request(id='sdata').json()
+        j = self.data_request({'id': 'sdata'}).json()
 
         self.temperature_units = j.get('temperature', 'C')
         self.model = j.get('model')
@@ -189,7 +187,7 @@ class VeraController(object):
         # to get all the info e need
         self.get_simple_devices_info()
 
-        j = self.data_request(id='status', output_format='json').json()
+        j = self.data_request({'id': 'status', 'output_format': 'json'}).json()
 
         service_map = {}
 
@@ -216,9 +214,8 @@ class VeraController(object):
         # double the timeout here so requests doesn't timeout before vera
         payload.update({
             'id': 'lu_sdata',
-            'timeout': TIMEOUT * 2
         })
-        result = self.data_request(**payload).json()
+        result = self.data_request(payload, TIMEOUT*2).json()
         device_data = result.get('devices')
         timestamp = {
             'loadtime': result.get('loadtime'),
@@ -302,15 +299,15 @@ class VeraDevice(object):  # pylint: disable=R0904
         """the http payload for setting a variable"""
         return 'new' + name + 'Value'
 
-    def data_request(self, **kwargs):
-        """Perfom a data_request for this device."""
+    def vera_request(self, **kwargs):
+        """Perfom a vera_request for this device."""
         request_payload = {
             'output_format': 'json',
             'DeviceNum': self.device_id,
         }
         request_payload.update(kwargs)
 
-        return self.vera_controller.data_request(**request_payload)
+        return self.vera_controller.data_request(request_payload)
 
     def set_value(self, name, value):
         """Set a variable on the vera device.
@@ -328,8 +325,8 @@ class VeraDevice(object):  # pylint: disable=R0904
                     'serviceId': service_id,
                     self.get_payload_parameter_name(name): value
                 }
-                result = self.data_request(**payload)
-                LOG.debug("Result of data_request with payload %s: %s",
+                result = self.vera_request(**payload)
+                LOG.debug("Result of vera_request with payload %s: %s",
                           payload,
                           result.text)
 
@@ -346,8 +343,8 @@ class VeraDevice(object):  # pylint: disable=R0904
             'serviceId': service_id,
             parameter_name: value
         }
-        result = self.data_request(**payload)
-        LOG.debug("Result of data_request with payload %s: %s", payload,
+        result = self.vera_request(**payload)
+        LOG.debug("Result of vera_request with payload %s: %s", payload,
                   result.text)
 
     def call_service(self, service_id, action):
@@ -355,7 +352,7 @@ class VeraDevice(object):  # pylint: disable=R0904
 
         This will call the Vera api to change device state.
         """
-        return self.data_request(id='action', serviceId=service_id,
+        return self.vera_request(id='action', serviceId=service_id,
                                  action=action)
 
     def set_cache_value(self, name, value):
@@ -403,7 +400,7 @@ class VeraDevice(object):  # pylint: disable=R0904
         for item in self.json_state.get('states'):
             if item.get('variable') == name:
                 service_id = item.get('service')
-                result = self.data_request(**{
+                result = self.vera_request(**{
                     'id': 'variableget',
                     'output_format': 'json',
                     'DeviceNum': self.device_id,
@@ -419,7 +416,7 @@ class VeraDevice(object):  # pylint: disable=R0904
 
         Only needed if you're not using subscriptions.
         """
-        j = self.data_request(id='sdata', output_format='json').json()
+        j = self.vera_request(id='sdata', output_format='json').json()
         devices = j.get('devices')
         for device_data in devices:
             if device_data.get('id') == self.device_id:
