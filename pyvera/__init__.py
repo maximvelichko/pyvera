@@ -755,7 +755,7 @@ class VeraThermostat(VeraDevice):
         """Set the hvac mode"""
         self.set_service_value(
             self.thermostat_operating_service,
-            'SetModeTarget',
+            'ModeTarget',
             'NewModeTarget',
             mode)
         self.set_cache_value('mode', mode)
@@ -786,7 +786,7 @@ class VeraThermostat(VeraDevice):
         """Set the fan mode"""
         self.set_service_value(
             self.thermostat_fan_service,
-            'SetModeTarget',
+            'ModeTarget',
             'NewModeTarget',
             mode)
         self.set_cache_value('fanmode', mode)
