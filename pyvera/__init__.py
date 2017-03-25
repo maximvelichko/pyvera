@@ -294,6 +294,16 @@ class VeraDevice(object):  # pylint: disable=R0904
         """Vera service string HVAC fan operating mode."""
         return 'urn:upnp-org:serviceId:HVAC_FanOperatingMode1'
 
+    @property
+    def thermostat_cool_setpoint(self):
+        """Vera service string Temperature Setpoint Heat."""
+        return 'urn:upnp-org:serviceId:TemperatureSetpoint1_Heat'
+
+    @property
+    def thermostat_heat_setpoint(self):
+        """Vera service string Temperature Setpoint1 Cool."""
+        return 'urn:upnp-org:serviceId:TemperatureSetpoint1_Cool'
+
     # pylint: disable=R0201
     def get_payload_parameter_name(self, name):
         """the http payload for setting a variable"""
@@ -309,29 +319,6 @@ class VeraDevice(object):  # pylint: disable=R0904
 
         return self.vera_controller.data_request(request_payload)
 
-    def set_value(self, name, value):
-        """Set a variable on the vera device.
-
-        This will call the Vera api to change device state.
-        """
-        for item in self.json_state.get('states'):
-            if item.get('variable') == name:
-                service_id = item.get('service')
-                LOG.debug("Set variable: %s using service_id: %s", name,
-                          service_id)
-                payload = {
-                    'id': 'lu_action',
-                    'action': 'Set' + name,
-                    'serviceId': service_id,
-                    self.get_payload_parameter_name(name): value
-                }
-                result = self.vera_request(**payload)
-                LOG.debug("Result of vera_request with payload %s: %s",
-                          payload,
-                          result.text)
-
-                item['value'] = value
-
     def set_service_value(self, service_id, set_name, parameter_name, value):
         """Set a variable on the vera device.
 
@@ -344,7 +331,7 @@ class VeraDevice(object):  # pylint: disable=R0904
             parameter_name: value
         }
         result = self.vera_request(**payload)
-        LOG.debug("Result of vera_request with payload %s: %s", payload,
+        LOG.debug("set_service_value: result of vera_request with payload %s: %s", payload,
                   result.text)
 
     def call_service(self, service_id, action):
@@ -352,8 +339,12 @@ class VeraDevice(object):  # pylint: disable=R0904
 
         This will call the Vera api to change device state.
         """
-        return self.vera_request(id='action', serviceId=service_id,
+        result =  self.vera_request(id='action', serviceId=service_id,
                                  action=action)
+        LOG.debug("call_service: result of vera_request with id %s: %s", service_id,
+                  result.text)
+
+        return result
 
     def set_cache_value(self, name, value):
         """Set a variable in the local state dictionary.
@@ -645,21 +636,18 @@ class VeraCurtain(VeraSwitch):
 
     def open(self):
         """Open the curtains."""
-        self.call_service(
-            self.window_covering_service,
-            'Up')
+        self.set_level(100)
 
     def close(self):
         """Close the curtains."""
-        self.call_service(
-            self.window_covering_service,
-            'Down')
+        self.set_level(0)
 
     def stop(self):
         """Open the curtains."""
         self.call_service(
             self.window_covering_service,
             'Stop')
+        return self.get_level(True)
 
     def is_open(self, refresh=False):
         """Get curtains state.
@@ -681,6 +669,8 @@ class VeraCurtain(VeraSwitch):
         if refresh:
             self.refresh()
         level = self.get_value('level')
+        LOG.debug("get_level: %s : %s", refresh, level)
+
         return 0 if level is None else int(level)
 
     def set_level(self, level):
@@ -736,7 +726,20 @@ class VeraThermostat(VeraDevice):
 
     def set_temperature(self, temp):
         """Set current goal temperature / setpoint"""
-        self.set_value('CurrentSetpoint', temp)
+
+        # Set both the heat and cool setpointa
+        self.set_service_value(
+            self.thermostat_cool_setpoint,
+            'CurrentSetpoint',
+            'NewCurrentSetpoint',
+            mode)
+
+        self.set_service_value(
+            self.thermostat_heat_setpoint,
+            'CurrentSetpoint',
+            'NewCurrentSetpoint',
+            mode)
+
         self.set_cache_value('setpoint', temp)
 
     def get_current_goal_temperature(self, refresh=False):
