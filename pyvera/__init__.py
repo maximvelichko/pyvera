@@ -304,11 +304,6 @@ class VeraDevice(object):  # pylint: disable=R0904
         """Vera service string Temperature Setpoint1 Cool."""
         return 'urn:upnp-org:serviceId:TemperatureSetpoint1_Cool'
 
-    # pylint: disable=R0201
-    def get_payload_parameter_name(self, name):
-        """the http payload for setting a variable"""
-        return 'new' + name + 'Value'
-
     def vera_request(self, **kwargs):
         """Perfom a vera_request for this device."""
         request_payload = {
@@ -720,9 +715,6 @@ class VeraLock(VeraDevice):
 
 class VeraThermostat(VeraDevice):
     """Class to represent a thermostat."""
-
-    def get_payload_parameter_name(self, name):
-        return "New" + name
 
     def set_temperature(self, temp):
         """Set current goal temperature / setpoint"""
