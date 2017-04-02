@@ -304,6 +304,11 @@ class VeraDevice(object):  # pylint: disable=R0904
         """Vera service string Temperature Setpoint Heat."""
         return 'urn:upnp-org:serviceId:TemperatureSetpoint1_Heat'
 
+    @property
+    def thermostat_setpoint(self):
+        """Vera service string Temperature Setpoint."""
+        return 'urn:upnp-org:serviceId:TemperatureSetpoint1'
+
     def vera_request(self, **kwargs):
         """Perfom a vera_request for this device."""
         request_payload = {
@@ -719,15 +724,8 @@ class VeraThermostat(VeraDevice):
     def set_temperature(self, temp):
         """Set current goal temperature / setpoint"""
 
-        # Set both the heat and cool setpointa
         self.set_service_value(
-            self.thermostat_cool_setpoint,
-            'CurrentSetpoint',
-            'NewCurrentSetpoint',
-            temp)
-
-        self.set_service_value(
-            self.thermostat_heat_setpoint,
+            self.thermostat_setpoint,
             'CurrentSetpoint',
             'NewCurrentSetpoint',
             temp)
