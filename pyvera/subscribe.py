@@ -124,8 +124,11 @@ class SubscriptionRegistry(object):
         timestamp = None
         while not self._exiting:
             try:
-                device_data, timestamp = (
-                    controller.get_changed_devices(timestamp, timeout = SCENE_CONTROLLER_TIMEOUT if self._scene_controllers else None))
+                timeout = (SCENE_CONTROLLER_TIMEOUT
+                           if self._scene_controllers
+                           else None)
+                device_data, timestamp = (controller.get_changed_devices(
+                    timestamp, timeout=timeout))
                 LOG.info("Poll returned")
                 if self._exiting:
                     continue

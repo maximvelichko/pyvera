@@ -334,17 +334,19 @@ class VeraDevice(object):  # pylint: disable=R0904
             parameter_name: value
         }
         result = self.vera_request(**payload)
-        LOG.debug("set_service_value: result of vera_request with payload %s: %s", payload,
-                  result.text)
+        LOG.debug("set_service_value: "
+                  "result of vera_request with payload %s: %s",
+                  payload, result.text)
 
     def call_service(self, service_id, action):
         """Call a Vera service.
 
         This will call the Vera api to change device state.
         """
-        result =  self.vera_request(id='action', serviceId=service_id,
-                                 action=action)
-        LOG.debug("call_service: result of vera_request with id %s: %s", service_id,
+        result = self.vera_request(id='action', serviceId=service_id,
+                                   action=action)
+        LOG.debug("call_service: "
+                  "result of vera_request with id %s: %s", service_id,
                   result.text)
 
         return result
@@ -840,4 +842,3 @@ class VeraSceneController(VeraDevice):
             self.refresh_complex_value('LastSceneTime')
         val = self.get_complex_value('LastSceneTime')
         return val
-
