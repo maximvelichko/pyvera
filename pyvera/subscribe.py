@@ -8,6 +8,8 @@ import requests
 # How long to wait before retrying Vera
 SUBSCRIPTION_RETRY = 10
 
+SCENE_CONTROLLER_TIMEOUT = 5
+
 # Vera state codes see http://wiki.micasaverde.com/index.php/Luup_Requests
 STATE_NO_JOB = -1
 STATE_JOB_WAITING_TO_START = 0
@@ -31,6 +33,7 @@ class SubscriptionRegistry(object):
         """Setup subscription."""
         self._devices = collections.defaultdict(list)
         self._callbacks = collections.defaultdict(list)
+        self._scene_controllers = []
         self._exiting = False
         self._poll_thread = None
 
@@ -47,15 +50,23 @@ class SubscriptionRegistry(object):
         LOG.info("Subscribing to events for %s", device.name)
         self._devices[device.vera_device_id].append(device)
         self._callbacks[device].append((callback))
+        if device.__class__.__name__ == 'VeraSceneController':
+            self._scene_controllers.append(device)
 
     def _event(self, device_data_list):
-        for device_data in device_data_list:
-            device_id = device_data['id']
-            device_list = self._devices.get(int(device_id))
-            if device_list is None:
-                return
-            for device in device_list:
-                self._event_device(device, device_data)
+        # Always claim scene controllers are updated
+        for device in self._scene_controllers:
+            for callback in self._callbacks.get(device, ()):
+                callback(device)
+
+        if device_data_list:
+            for device_data in device_data_list:
+                device_id = device_data['id']
+                device_list = self._devices.get(int(device_id))
+                if device_list is None:
+                    return
+                for device in device_list:
+                    self._event_device(device, device_data)
 
     def _event_device(self, device, device_data):
         if device is None:
@@ -114,11 +125,11 @@ class SubscriptionRegistry(object):
         while not self._exiting:
             try:
                 device_data, timestamp = (
-                    controller.get_changed_devices(timestamp))
+                    controller.get_changed_devices(timestamp, timeout = SCENE_CONTROLLER_TIMEOUT if self._scene_controllers else None))
                 LOG.info("Poll returned")
                 if self._exiting:
                     continue
-                if not device_data:
+                if not device_data and not self._scene_controllers:
                     LOG.info("No changes in poll interval")
                     continue
                 self._event(device_data)
