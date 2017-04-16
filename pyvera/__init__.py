@@ -125,6 +125,8 @@ class VeraController(object):
                     self.devices.append(VeraSensor(item, self))
                 elif device_category == 'Light Sensor':
                     self.devices.append(VeraSensor(item, self))
+                elif device_category == 'Power meter':
+                    self.devices.append(VeraSensor(item, self))
                 elif device_category == 'Sensor':
                     sensor = VeraBinarySensor(item, self)
                     self.devices.append(sensor)
@@ -484,6 +486,11 @@ class VeraDevice(object):  # pylint: disable=R0904
     def power(self):
         """Current power useage in watts"""
         return self.get_value('Watts')
+
+    @property
+    def energy(self):
+        """Energy useage in kwh"""
+        return self.get_value('kwh')
 
     @property
     def vera_device_id(self):
