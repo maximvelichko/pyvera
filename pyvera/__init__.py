@@ -495,6 +495,10 @@ class VeraDevice(object):  # pylint: disable=R0904
         """The ID Vera uses to refer to the device."""
         return self.device_id
 
+    @property
+    def should_poll(self):
+        return False
+
 
 class VeraSwitch(VeraDevice):
     """Class to add switch functionality."""
@@ -842,3 +846,7 @@ class VeraSceneController(VeraDevice):
             self.refresh_complex_value('LastSceneTime')
         val = self.get_complex_value('LastSceneTime')
         return val
+
+    @property
+    def should_poll(self):
+        return True
