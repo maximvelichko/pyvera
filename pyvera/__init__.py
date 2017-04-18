@@ -200,7 +200,7 @@ class VeraController(object):
 
         self.device_services_map = service_map
 
-    def get_changed_devices(self, timestamp, timeout=SUBSCRIPTION_WAIT):
+    def get_changed_devices(self, timestamp):
         """Get data since last timestamp.
 
         This is done via a blocking call, pass NONE for initial state.
@@ -209,7 +209,7 @@ class VeraController(object):
             payload = {}
         else:
             payload = {
-                'timeout': timeout,
+                'timeout': SUBSCRIPTION_WAIT,
                 'minimumdelay': SUBSCRIPTION_MIN_WAIT
             }
             payload.update(timestamp)
