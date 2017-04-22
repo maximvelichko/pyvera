@@ -153,13 +153,13 @@ class VeraController(object):
 
         if not category_filter:
             return self.devices
-        else:
-            devices = []
-            for device in self.devices:
-                if (device.category is not None and device.category != '' and
-                        device.category in category_filter):
-                    devices.append(device)
-            return devices
+
+        devices = []
+        for device in self.devices:
+            if (device.category is not None and device.category != '' and
+                    device.category in category_filter):
+                devices.append(device)
+        return devices
 
     def refresh_data(self):
         """Refresh data from Vera device."""
@@ -504,6 +504,7 @@ class VeraDevice(object):  # pylint: disable=R0904
 
     @property
     def should_poll(self):
+        """Whether polling is needed if using subscriptions for this device."""
         return False
 
 
@@ -732,6 +733,10 @@ class VeraLock(VeraDevice):
             self.refresh_complex_value('Status')
         val = self.get_complex_value('Status')
         return val == '1'
+
+    @property
+    def should_poll(self):
+        return True
 
 
 class VeraThermostat(VeraDevice):
