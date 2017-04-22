@@ -146,6 +146,8 @@ class VeraController(object):
                     self.devices.append(VeraLock(item, self))
                 elif device_category == 'Thermostat':
                     self.devices.append(VeraThermostat(item, self))
+                elif device_category == 'Scene Controller':
+                    self.devices.append(VeraSceneController(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
 
@@ -219,6 +221,7 @@ class VeraController(object):
         })
         result = self.data_request(payload, TIMEOUT*2).json()
         device_data = result.get('devices')
+
         timestamp = {
             'loadtime': result.get('loadtime'),
             'dataversion': result.get('dataversion')
@@ -333,17 +336,19 @@ class VeraDevice(object):  # pylint: disable=R0904
             parameter_name: value
         }
         result = self.vera_request(**payload)
-        LOG.debug("set_service_value: result of vera_request with payload %s: %s", payload,
-                  result.text)
+        LOG.debug("set_service_value: "
+                  "result of vera_request with payload %s: %s",
+                  payload, result.text)
 
     def call_service(self, service_id, action):
         """Call a Vera service.
 
         This will call the Vera api to change device state.
         """
-        result =  self.vera_request(id='action', serviceId=service_id,
-                                 action=action)
-        LOG.debug("call_service: result of vera_request with id %s: %s", service_id,
+        result = self.vera_request(id='action', serviceId=service_id,
+                                   action=action)
+        LOG.debug("call_service: "
+                  "result of vera_request with id %s: %s", service_id,
                   result.text)
 
         return result
@@ -496,6 +501,10 @@ class VeraDevice(object):  # pylint: disable=R0904
     def vera_device_id(self):
         """The ID Vera uses to refer to the device."""
         return self.device_id
+
+    @property
+    def should_poll(self):
+        return False
 
 
 class VeraSwitch(VeraDevice):
@@ -818,3 +827,33 @@ class VeraThermostat(VeraDevice):
     def fan_cycle(self):
         """Set fan to cycle"""
         self.set_fan_mode('PeriodicOn')
+
+
+class VeraSceneController(VeraDevice):
+    """Class to represent a scene controller."""
+
+    def get_last_scene_id(self, refresh=False):
+        """Get last scene id.
+
+        Refresh data from Vera if refresh is True, otherwise use local cache.
+        Refresh is only needed if you're not using subscriptions.
+        """
+        if refresh:
+            self.refresh_complex_value('LastSceneID')
+        val = self.get_complex_value('LastSceneID')
+        return val
+
+    def get_last_scene_time(self, refresh=False):
+        """Get last scene time.
+
+        Refresh data from Vera if refresh is True, otherwise use local cache.
+        Refresh is only needed if you're not using subscriptions.
+        """
+        if refresh:
+            self.refresh_complex_value('LastSceneTime')
+        val = self.get_complex_value('LastSceneTime')
+        return val
+
+    @property
+    def should_poll(self):
+        return True
