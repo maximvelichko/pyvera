@@ -1,5 +1,6 @@
 """Module to listen for vera events."""
 import collections
+import json
 import logging
 import time
 import threading
@@ -44,7 +45,7 @@ class SubscriptionRegistry(object):
             LOG.error("Received an invalid device: %r", device)
             return
 
-        LOG.info("Subscribing to events for %s", device.name)
+        LOG.debug("Subscribing to events for %s", device.name)
         self._devices[device.vera_device_id].append(device)
         self._callbacks[device].append((callback))
 
@@ -65,6 +66,10 @@ class SubscriptionRegistry(object):
         state = int(device_data.get('state', STATE_NOT_PRESENT))
         comment = device_data.get('comment', '')
         sending = comment.find('Sending') >= 0
+        LOG.debug("Event: %s, state %s, %s",
+                  device.name,
+                  state,
+                  json.dumps(device_data))
         if sending and state == STATE_NO_JOB:
             state = STATE_JOB_WAITING_TO_START
         if (state == STATE_JOB_IN_PROGRESS and
@@ -115,11 +120,11 @@ class SubscriptionRegistry(object):
             try:
                 device_data, timestamp = (
                     controller.get_changed_devices(timestamp))
-                LOG.info("Poll returned")
+                LOG.debug("Poll returned")
                 if self._exiting:
                     continue
                 if not device_data:
-                    LOG.info("No changes in poll interval")
+                    LOG.debug("No changes in poll interval")
                     continue
                 self._event(device_data)
                 time.sleep(1)
