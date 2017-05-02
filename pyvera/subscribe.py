@@ -132,6 +132,10 @@ class SubscriptionRegistry(object):
                 LOG.info("Could not contact Vera - will retry in %ss",
                          SUBSCRIPTION_RETRY)
                 time.sleep(SUBSCRIPTION_RETRY)
+            except json.decoder.JSONDecodeError:
+                LOG.exception("Response was malfomed - will retry in %ss",
+                         SUBSCRIPTION_RETRY)
+                time.sleep(SUBSCRIPTION_RETRY)
             except Exception as ex:
                 LOG.exception("Vera thread exception %s", ex)
                 raise
