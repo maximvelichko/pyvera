@@ -133,7 +133,7 @@ class SubscriptionRegistry(object):
                          SUBSCRIPTION_RETRY)
                 time.sleep(SUBSCRIPTION_RETRY)
             except json.decoder.JSONDecodeError:
-                LOG.exception("Response was malfomed - will retry in %ss",
+                LOG.info("Response was malfomed - will retry in %ss",
                          SUBSCRIPTION_RETRY)
                 time.sleep(SUBSCRIPTION_RETRY)
             except Exception as ex:
