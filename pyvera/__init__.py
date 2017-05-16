@@ -475,6 +475,22 @@ class VeraDevice(object):  # pylint: disable=R0904
         return self.get_value('Light')
 
     @property
+    def level(self):
+        """Get level from vera."""
+        # Used for dimmers, curtains
+        # Have seen formats of 10, 0.0 and "0%"!
+        level = self.get_value('level')
+        try:
+            return int(float(level))
+        except (TypeError, ValueError):
+            pass
+        try:
+            return int(level.strip('%'))
+        except (TypeError, AttributeError, ValueError):
+            pass
+        return 0
+
+    @property
     def temperature(self):
         """Temperature.
 
@@ -573,8 +589,7 @@ class VeraDimmer(VeraSwitch):
         if refresh:
             self.refresh()
         brightness = 0
-        level = self.get_value('level')
-        percent = 0 if level is None else int(level)
+        percent = self.level
         if percent > 0:
             brightness = round(percent * 2.55)
         return int(brightness)
@@ -685,10 +700,8 @@ class VeraCurtain(VeraSwitch):
         """
         if refresh:
             self.refresh()
-        level = self.get_value('level')
-        LOG.debug("get_level: %s : %s", refresh, level)
+        return self.level
 
-        return 0 if level is None else int(level)
 
     def set_level(self, level):
         """Set open level of the curtains.
