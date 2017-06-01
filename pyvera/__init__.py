@@ -372,6 +372,17 @@ class VeraDevice(object):  # pylint: disable=R0904
             return
         dev_info[name.lower()] = str(value)
 
+    def set_cache_complex_value(self, name, value):
+        """Set a variable in the local complex state dictionary.
+
+        This does not change the physical device. Useful if you want the
+        device state to refect a new value which has not yet updated drom
+        Vera.
+        """
+        for item in self.json_state.get('states'):
+            if item.get('variable') == name:
+                item['value'] = str(value)
+
     def get_complex_value(self, name):
         """Get a value from the service dictionaries.
 
@@ -657,7 +668,7 @@ class VeraDimmer(VeraSwitch):
                   str(rgbi[0]) + '=' + str(rgb[0]) + ',' +
                   str(rgbi[1]) + '=' + str(rgb[1]) + ',' +
                   str(rgbi[2]) + '=' + str(rgb[2]))
-        self.set_cache_value('TargetColor', target)
+        self.set_cache_complex_value("CurrentColor", target)
 
 
 class VeraArmableDevice(VeraSwitch):
@@ -749,7 +760,6 @@ class VeraCurtain(VeraSwitch):
         if refresh:
             self.refresh()
         return self.level
-
 
     def set_level(self, level):
         """Set open level of the curtains.
