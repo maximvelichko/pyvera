@@ -314,6 +314,11 @@ class VeraDevice(object):  # pylint: disable=R0904
         """Vera service string Temperature Setpoint."""
         return 'urn:upnp-org:serviceId:TemperatureSetpoint1'
 
+    @property
+    def color_service(self):
+        """Vera service string for color."""
+        return 'urn:micasaverde-com:serviceId:Color1'
+
     def vera_request(self, **kwargs):
         """Perfom a vera_request for this device."""
         request_payload = {
@@ -350,7 +355,6 @@ class VeraDevice(object):  # pylint: disable=R0904
         LOG.debug("call_service: "
                   "result of vera_request with id %s: %s", service_id,
                   result.text)
-
         return result
 
     def set_cache_value(self, name, value):
@@ -610,6 +614,50 @@ class VeraDimmer(VeraSwitch):
             'newLoadlevelTarget',
             percent)
         self.set_cache_value('level', percent)
+
+    def get_color_index(self, colors, refresh=False):
+        """Get color index.
+
+        Refresh data from Vera if refresh is True, otherwise use local cache.
+        Refresh is only needed if you're not using subscriptions.
+        """
+        if refresh:
+            self.refresh_complex_value('SupportedColors')
+        sup = self.get_complex_value('SupportedColors').split(',')
+        rgb = [sup.index(c) for c in colors]
+        return rgb
+
+    def get_color(self, refresh=False):
+        """Get color.
+
+        Refresh data from Vera if refresh is True, otherwise use local cache.
+        Refresh is only needed if you're not using subscriptions.
+        """
+        if refresh:
+            self.refresh_complex_value('CurrentColor')
+
+        rgb = self.get_color_index(['R', 'G', 'B'], refresh)
+        cur = self.get_complex_value('CurrentColor').split(',')
+        val = [cur[c] for c in rgb]
+        return [int(v.split('=')[1]) for v in val]
+
+    def set_color(self, rgb):
+        """Set dimmer color.
+        """
+
+        target = ','.join([str(c) for c in rgb])
+        self.set_service_value(
+            self.color_service,
+            'ColorRGB',
+            'newColorRGBTarget',
+            target)
+
+        rgbi = self.get_color_index(['R', 'G', 'B'])
+        target = ('0=0,1=0,' +
+                  str(rgbi[0]) + '=' + str(rgb[0]) + ',' +
+                  str(rgbi[1]) + '=' + str(rgb[1]) + ',' +
+                  str(rgbi[2]) + '=' + str(rgb[2]))
+        self.set_cache_value('TargetColor', target)
 
 
 class VeraArmableDevice(VeraSwitch):
