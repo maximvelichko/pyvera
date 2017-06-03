@@ -813,8 +813,8 @@ class VeraThermostat(VeraDevice):
         """Set the fan mode"""
         self.set_service_value(
             self.thermostat_fan_service,
-            'ModeTarget',
-            'NewModeTarget',
+            'Mode',
+            'NewMode',
             mode)
         self.set_cache_value('fanmode', mode)
 
