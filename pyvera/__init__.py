@@ -630,7 +630,6 @@ class VeraDimmer(VeraSwitch):
         """Get color index.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
-        Refresh is only needed if you're not using subscriptions.
         """
         if refresh:
             self.refresh_complex_value('SupportedColors')
@@ -642,7 +641,6 @@ class VeraDimmer(VeraSwitch):
         """Get color.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
-        Refresh is only needed if you're not using subscriptions.
         """
         if refresh:
             self.refresh_complex_value('CurrentColor')
