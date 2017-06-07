@@ -254,7 +254,7 @@ class VeraDevice(object):  # pylint: disable=R0904
         if self.json_state.get('deviceInfo'):
             self.category = (
                 self.json_state.get('deviceInfo').get('categoryName'))
-            self.name = self.json_state.get('deviceInfo').get('name')
+            self.name = self.json_state.get('deviceInfo').get('name') + ' ' + str(self.device_id)
         else:
             self.category = ''
 
