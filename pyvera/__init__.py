@@ -633,9 +633,12 @@ class VeraDimmer(VeraSwitch):
         """
         if refresh:
             self.refresh_complex_value('SupportedColors')
-        sup = self.get_complex_value('SupportedColors').split(',')
-        rgb = [sup.index(c) for c in colors]
-        return rgb
+
+        ci = None
+        sup = self.get_complex_value('SupportedColors')
+        if sup is not None:
+            ci = [sup.split(',').index(c) for c in colors]
+        return ci
 
     def get_color(self, refresh=False):
         """Get color.
@@ -645,10 +648,13 @@ class VeraDimmer(VeraSwitch):
         if refresh:
             self.refresh_complex_value('CurrentColor')
 
-        rgb = self.get_color_index(['R', 'G', 'B'], refresh)
-        cur = self.get_complex_value('CurrentColor').split(',')
-        val = [cur[c] for c in rgb]
-        return [int(v.split('=')[1]) for v in val]
+        rgb = None
+        ci = self.get_color_index(['R', 'G', 'B'], refresh)
+        cur = self.get_complex_value('CurrentColor')
+        if ci is not None and cur is not None:
+            val = [cur.split(',')[c] for c in ci]
+            rgb = [int(v.split('=')[1]) for v in val]
+        return rgb
 
     def set_color(self, rgb):
         """Set dimmer color.
