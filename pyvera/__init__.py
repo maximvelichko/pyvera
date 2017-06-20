@@ -832,13 +832,19 @@ class VeraThermostat(VeraDevice):
         """Get current goal temperature / setpoint"""
         if refresh:
             self.refresh()
-        return float(self.get_value('setpoint'))
+        try:
+            return float(self.get_value('setpoint'))
+        except (TypeError, ValueError):
+            return None
 
     def get_current_temperature(self, refresh=False):
         """Get current temperature"""
         if refresh:
             self.refresh()
-        return float(self.get_value('temperature'))
+        try:
+            return float(self.get_value('temperature'))
+        except (TypeError, ValueError):
+            return None
 
     def set_hvac_mode(self, mode):
         """Set the hvac mode"""
