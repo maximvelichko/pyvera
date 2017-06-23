@@ -637,7 +637,10 @@ class VeraDimmer(VeraSwitch):
         ci = None
         sup = self.get_complex_value('SupportedColors')
         if sup is not None:
-            ci = [sup.split(',').index(c) for c in colors]
+            try:
+                ci = [sup.split(',').index(c) for c in colors]
+            except (TypeError, ValueError, IndexError):
+                pass
         return ci
 
     def get_color(self, refresh=False):
@@ -652,8 +655,11 @@ class VeraDimmer(VeraSwitch):
         ci = self.get_color_index(['R', 'G', 'B'], refresh)
         cur = self.get_complex_value('CurrentColor')
         if ci is not None and cur is not None:
-            val = [cur.split(',')[c] for c in ci]
-            rgb = [int(v.split('=')[1]) for v in val]
+            try:
+                val = [cur.split(',')[c] for c in ci]
+                rgb = [int(v.split('=')[1]) for v in val]
+            except (TypeError, ValueError, IndexError):
+                pass
         return rgb
 
     def set_color(self, rgb):
