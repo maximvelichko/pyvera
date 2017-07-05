@@ -634,14 +634,15 @@ class VeraDimmer(VeraSwitch):
         if refresh:
             self.refresh_complex_value('SupportedColors')
 
-        ci = None
         sup = self.get_complex_value('SupportedColors')
-        if sup is not None:
-            try:
-                ci = [sup.split(',').index(c) for c in colors]
-            except (TypeError, ValueError, IndexError):
-                pass
-        return ci
+        if sup is None:
+            return None
+
+        sup = sup.split(',')
+        if not set(colors).issubset(sup):
+            return None
+
+        return [sup.index(c) for c in colors]
 
     def get_color(self, refresh=False):
         """Get color.
@@ -651,16 +652,13 @@ class VeraDimmer(VeraSwitch):
         if refresh:
             self.refresh_complex_value('CurrentColor')
 
-        rgb = None
         ci = self.get_color_index(['R', 'G', 'B'], refresh)
         cur = self.get_complex_value('CurrentColor')
-        if ci is not None and cur is not None:
-            try:
-                val = [cur.split(',')[c] for c in ci]
-                rgb = [int(v.split('=')[1]) for v in val]
-            except (TypeError, ValueError, IndexError):
-                pass
-        return rgb
+        if ci is None or cur is None:
+            return None
+
+        val = [cur.split(',')[c] for c in ci]
+        return [int(v.split('=')[1]) for v in val]
 
     def set_color(self, rgb):
         """Set dimmer color.
@@ -674,6 +672,9 @@ class VeraDimmer(VeraSwitch):
             target)
 
         rgbi = self.get_color_index(['R', 'G', 'B'])
+        if rgbi is None:
+            return
+
         target = ('0=0,1=0,' +
                   str(rgbi[0]) + '=' + str(rgb[0]) + ',' +
                   str(rgbi[1]) + '=' + str(rgb[1]) + ',' +
