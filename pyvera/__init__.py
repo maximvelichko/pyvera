@@ -657,8 +657,11 @@ class VeraDimmer(VeraSwitch):
         if ci is None or cur is None:
             return None
 
-        val = [cur.split(',')[c] for c in ci]
-        return [int(v.split('=')[1]) for v in val]
+        try:
+            val = [cur.split(',')[c] for c in ci]
+            return [int(v.split('=')[1]) for v in val]
+        except IndexError:
+            return None
 
     def set_color(self, rgb):
         """Set dimmer color.
