@@ -85,7 +85,9 @@ class SubscriptionRegistry(object):
             return
         if not (state == STATE_JOB_DONE or
                 state == STATE_NOT_PRESENT or
-                state == STATE_NO_JOB):
+                state == STATE_NO_JOB or
+                (state == STATE_JOB_ERROR and 
+                comment.find('Setting user configuration'))):
             LOG.error("Device %s, state %s, %s",
                       device.name,
                       state,
