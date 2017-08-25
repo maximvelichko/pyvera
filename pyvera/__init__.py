@@ -111,18 +111,10 @@ class VeraController(object):
             item['deviceInfo'] = self.device_id_map.get(item.get('id'))
             if item.get('deviceInfo'):
                 device_category = item.get('deviceInfo').get('category')
-                if device_category == 1:     # Interface
-                    self.devices.append(VeraSceneController(item, self))
-                elif device_category == 2:   # Dimmable Light
+                if device_category == 2:     # Dimmable Light
                     self.devices.append(VeraDimmer(item, self))
                 elif device_category == 3:   # Switch
                     self.devices.append(VeraSwitch(item, self))
-                elif device_category == 5:   # HVAC
-                    self.devices.append(VeraThermostat(item, self))
-                elif device_category == 7:   # Door Lock
-                    self.devices.append(VeraLock(item, self))
-                elif device_category == 8:   # Window Covering
-                    self.devices.append(VeraCurtain(item, self))
                 elif device_category == 4:   # Security Sensor
                     sensor = VeraBinarySensor(item, self)
                     self.devices.append(sensor)
@@ -130,8 +122,16 @@ class VeraController(object):
                         armable = VeraArmableDevice(item, self)
                         armable.category = 'Armable Sensor'
                         self.devices.append(armable)
+                elif device_category == 5:   # HVAC
+                    self.devices.append(VeraThermostat(item, self))
+                elif device_category == 7:   # Door Lock
+                    self.devices.append(VeraLock(item, self))
+                elif device_category == 8:   # Window Covering
+                    self.devices.append(VeraCurtain(item, self))
                 elif device_category == 12:  # Generic Sensor
                     self.devices.append(VeraSensor(item, self))
+                elif device_category == 14:  # Scene Controller
+                    self.devices.append(VeraSceneController(item, self))
                 elif device_category == 16:  # Humidity Sensor
                     self.devices.append(VeraSensor(item, self))
                 elif device_category == 17:  # Temperature Sensor
