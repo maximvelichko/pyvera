@@ -110,44 +110,38 @@ class VeraController(object):
         for item in items:
             item['deviceInfo'] = self.device_id_map.get(item.get('id'))
             if item.get('deviceInfo'):
-                device_category = item.get('deviceInfo').get('categoryName')
-                if device_category == 'Switch':
-                    self.devices.append(VeraSwitch(item, self))
-                elif device_category == 'On/Off Switch':
-                    self.devices.append(VeraSwitch(item, self))
-                elif device_category == 'Dimmable Switch':
+                device_category = item.get('deviceInfo').get('category')
+                if device_category == 1:     # Interface
+                    self.devices.append(VeraSceneController(item, self))
+                elif device_category == 2:   # Dimmable Light
                     self.devices.append(VeraDimmer(item, self))
-                elif device_category == 'Dimmable Light':
-                    self.devices.append(VeraDimmer(item, self))
-                elif device_category == 'Temperature Sensor':
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == 'Humidity Sensor':
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == 'Light Sensor':
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == 'Power meter':
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == 'Sensor':
+                elif device_category == 3:   # Switch
+                    self.devices.append(VeraSwitch(item, self))
+                elif device_category == 5:   # HVAC
+                    self.devices.append(VeraThermostat(item, self))
+                elif device_category == 7:   # Door Lock
+                    self.devices.append(VeraLock(item, self))
+                elif device_category == 8:   # Window Covering
+                    self.devices.append(VeraCurtain(item, self))
+                elif device_category == 4:   # Security Sensor
                     sensor = VeraBinarySensor(item, self)
                     self.devices.append(sensor)
                     if sensor.is_armable:
                         armable = VeraArmableDevice(item, self)
                         armable.category = 'Armable Sensor'
                         self.devices.append(armable)
-                elif device_category == 'Light Sensor':
+                elif device_category == 12:  # Generic Sensor
                     self.devices.append(VeraSensor(item, self))
-                elif device_category == 'Window Covering':
-                    self.devices.append(VeraCurtain(item, self))
-                elif device_category == 'Window covering':
-                    self.devices.append(VeraCurtain(item, self))
-                elif device_category == 'Doorlock':
-                    self.devices.append(VeraLock(item, self))
-                elif device_category == 'Door lock':
-                    self.devices.append(VeraLock(item, self))
-                elif device_category == 'Thermostat':
-                    self.devices.append(VeraThermostat(item, self))
-                elif device_category == 'Scene Controller':
-                    self.devices.append(VeraSceneController(item, self))
+                elif device_category == 16:  # Humidity Sensor
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == 17:  # Temperature Sensor
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == 18:  # Light Sensor
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == 21:  # Power Meter
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == 28:  # UV Sensor
+                    self.devices.append(VeraSensor(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
 
