@@ -17,6 +17,19 @@ SUBSCRIPTION_MIN_WAIT = 200
 # Timeout for requests calls, as vera sometimes just sits on sockets.
 TIMEOUT = SUBSCRIPTION_WAIT
 
+CATEGORY_DIMMER = 2
+CATEGORY_SWITCH = 3
+CATEGORY_ARMABLE = 4
+CATEGORY_THERMOSTAT = 5
+CATEGORY_LOCK = 7
+CATEGORY_CURTAIN = 8
+CATEGORY_SENSOR = 12
+CATEGORY_SCENE_CONTROLLER = 14
+CATEGORY_HUMIDITY_SENSOR = 16
+CATEGORY_TEMPERATURE_SENSOR = 17
+CATEGORY_LIGHT_SENSOR = 18
+CATEGORY_POWER_METER = 21
+CATEGORY_UV_SENSOR = 28
 
 _VERA_CONTROLLER = None
 
@@ -110,44 +123,38 @@ class VeraController(object):
         for item in items:
             item['deviceInfo'] = self.device_id_map.get(item.get('id'))
             if item.get('deviceInfo'):
-                device_category = item.get('deviceInfo').get('categoryName')
-                if device_category == 'Switch':
-                    self.devices.append(VeraSwitch(item, self))
-                elif device_category == 'On/Off Switch':
-                    self.devices.append(VeraSwitch(item, self))
-                elif device_category == 'Dimmable Switch':
+                device_category = item.get('deviceInfo').get('category')
+                if device_category == CATEGORY_DIMMER:
                     self.devices.append(VeraDimmer(item, self))
-                elif device_category == 'Dimmable Light':
-                    self.devices.append(VeraDimmer(item, self))
-                elif device_category == 'Temperature Sensor':
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == 'Humidity Sensor':
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == 'Light Sensor':
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == 'Power meter':
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == 'Sensor':
+                elif device_category == CATEGORY_SWITCH:
+                    self.devices.append(VeraSwitch(item, self))
+                elif device_category == CATEGORY_ARMABLE:
                     sensor = VeraBinarySensor(item, self)
                     self.devices.append(sensor)
                     if sensor.is_armable:
                         armable = VeraArmableDevice(item, self)
-                        armable.category = 'Armable Sensor'
+                        armable.category_name = 'Armable Sensor'
                         self.devices.append(armable)
-                elif device_category == 'Light Sensor':
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == 'Window Covering':
-                    self.devices.append(VeraCurtain(item, self))
-                elif device_category == 'Window covering':
-                    self.devices.append(VeraCurtain(item, self))
-                elif device_category == 'Doorlock':
-                    self.devices.append(VeraLock(item, self))
-                elif device_category == 'Door lock':
-                    self.devices.append(VeraLock(item, self))
-                elif device_category == 'Thermostat':
+                elif device_category == CATEGORY_THERMOSTAT:
                     self.devices.append(VeraThermostat(item, self))
-                elif device_category == 'Scene Controller':
+                elif device_category == CATEGORY_LOCK:
+                    self.devices.append(VeraLock(item, self))
+                elif device_category == CATEGORY_CURTAIN:
+                    self.devices.append(VeraCurtain(item, self))
+                elif device_category == CATEGORY_SENSOR:
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == CATEGORY_SCENE_CONTROLLER:
                     self.devices.append(VeraSceneController(item, self))
+                elif device_category == CATEGORY_HUMIDITY_SENSOR:
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == CATEGORY_TEMPERATURE_SENSOR:
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == CATEGORY_LIGHT_SENSOR:
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == CATEGORY_POWER_METER:
+                    self.devices.append(VeraSensor(item, self))
+                elif device_category == CATEGORY_UV_SENSOR:
+                    self.devices.append(VeraSensor(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
 
@@ -156,8 +163,8 @@ class VeraController(object):
 
         devices = []
         for device in self.devices:
-            if (device.category is not None and device.category != '' and
-                    device.category in category_filter):
+            if (device.category_name is not None and device.category_name != '' and
+                    device.category_name in category_filter):
                 devices.append(device)
         return devices
 
@@ -252,15 +259,17 @@ class VeraDevice(object):  # pylint: disable=R0904
         self.name = ''
 
         if self.json_state.get('deviceInfo'):
-            self.category = (
+            self.category = self.json_state.get('deviceInfo').get('category')
+            self.category_name = (
                 self.json_state.get('deviceInfo').get('categoryName'))
             self.name = self.json_state.get('deviceInfo').get('name')
         else:
-            self.category = ''
+            self.category_name = ''
 
         if not self.name:
-            if self.category:
-                self.name = 'Vera ' + self.category + ' ' + str(self.device_id)
+            if self.category_name:
+                self.name = ('Vera ' + self.category_name +
+                             ' ' + str(self.device_id))
             else:
                 self.name = 'Vera Device ' + str(self.device_id)
 
@@ -456,7 +465,7 @@ class VeraDevice(object):  # pylint: disable=R0904
     @property
     def is_dimmable(self):
         """Device is dimmable."""
-        return 'dimmable' in self.category.lower()
+        return self.category == CATEGORY_DIMMER
 
     @property
     def is_trippable(self):
