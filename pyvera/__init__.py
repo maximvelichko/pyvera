@@ -125,36 +125,31 @@ class VeraController(object):
             if item.get('deviceInfo'):
                 device_category = item.get('deviceInfo').get('category')
                 if device_category == CATEGORY_DIMMER:
-                    self.devices.append(VeraDimmer(item, self))
+                    device = VeraDimmer(item, self)
                 elif device_category == CATEGORY_SWITCH:
-                    self.devices.append(VeraSwitch(item, self))
-                elif device_category == CATEGORY_ARMABLE:
-                    sensor = VeraBinarySensor(item, self)
-                    self.devices.append(sensor)
-                    if sensor.is_armable:
-                        armable = VeraArmableDevice(item, self)
-                        armable.category_name = 'Armable Sensor'
-                        self.devices.append(armable)
+                    device = VeraSwitch(item, self)
                 elif device_category == CATEGORY_THERMOSTAT:
-                    self.devices.append(VeraThermostat(item, self))
+                    device = VeraThermostat(item, self)
                 elif device_category == CATEGORY_LOCK:
-                    self.devices.append(VeraLock(item, self))
+                    device = VeraLock(item, self)
                 elif device_category == CATEGORY_CURTAIN:
-                    self.devices.append(VeraCurtain(item, self))
-                elif device_category == CATEGORY_SENSOR:
-                    self.devices.append(VeraSensor(item, self))
+                    device = VeraCurtain(item, self)
+                elif device_category == CATEGORY_ARMABLE:
+                    device = VeraBinarySensor(item, self)
+                elif (device_category == CATEGORY_SENSOR or
+                      device_category == CATEGORY_HUMIDITY_SENSOR or
+                      device_category == CATEGORY_TEMPERATURE_SENSOR or
+                      device_category == CATEGORY_LIGHT_SENSOR or
+                      device_category == CATEGORY_POWER_METER or
+                      device_category == CATEGORY_UV_SENSOR):
+                    device = VeraSensor(item, self)
                 elif device_category == CATEGORY_SCENE_CONTROLLER:
-                    self.devices.append(VeraSceneController(item, self))
-                elif device_category == CATEGORY_HUMIDITY_SENSOR:
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == CATEGORY_TEMPERATURE_SENSOR:
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == CATEGORY_LIGHT_SENSOR:
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == CATEGORY_POWER_METER:
-                    self.devices.append(VeraSensor(item, self))
-                elif device_category == CATEGORY_UV_SENSOR:
-                    self.devices.append(VeraSensor(item, self))
+                    device = VeraSceneController(item, self)
+                else:
+                    device = VeraDevice(item, self)
+                self.devices.append(device)
+                if device.is_armable:
+                    self.devices.append(VeraArmableDevice(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
 
@@ -163,7 +158,8 @@ class VeraController(object):
 
         devices = []
         for device in self.devices:
-            if (device.category_name is not None and device.category_name != '' and
+            if (device.category_name is not None and
+                    device.category_name != '' and
                     device.category_name in category_filter):
                 devices.append(device)
         return devices
@@ -272,6 +268,13 @@ class VeraDevice(object):  # pylint: disable=R0904
                              ' ' + str(self.device_id))
             else:
                 self.name = 'Vera Device ' + str(self.device_id)
+
+    def __repr__(self):
+        return "{} (id={} category={} name={})".format(
+            self.__class__.__name__,
+            self.device_id,
+            self.category_name,
+            self.name)
 
     @property
     def switch_service(self):
