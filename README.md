@@ -14,13 +14,10 @@ How to use
     >>> controller = pyvera.VeraController("http://192.168.1.161:3480/")
     >>> devices = controller.get_devices('On/Off Switch')
     >>> devices
-    [<pyvera.VeraSwitch object at 0x105ea8dd8>, <pyvera.VeraSwitch object at 0x105ea8c18>]
+    [VeraSwitch (id=15 category=On/Off Switch name=Bookcase Uplighters), VeraSwitch (id=16 category=On/Off Switch name=Bookcase device)]
 
-    >>> devices[0]
-    <pyvera.VeraSwitch object at 0x105ea8dd8>
-
-    >>> devices[1].name
-    'Bookcase Uplighters'
+    >>> devices[1]
+    VeraSwitch (id=15 category=On/Off Switch name=Bookcase Uplighters)
 
     >>> devices[1].is_switched_on()
     False
