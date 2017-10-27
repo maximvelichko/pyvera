@@ -148,7 +148,7 @@ class VeraController(object):
                 else:
                     device = VeraDevice(item, self)
                 self.devices.append(device)
-                if device.is_armable:
+                if device_category != CATEGORY_SWITCH and device.is_armable:
                     self.devices.append(VeraArmableDevice(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
