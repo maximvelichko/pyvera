@@ -989,7 +989,8 @@ class VeraScene(object):
         self.json_state = json_obj
         self.scene_id = self.json_state.get('id')
         self.vera_controller = vera_controller
-        self.name = ''
+        self.name = self.json_state.get('name')
+        self._active = False
 
         if not self.name:
             self.name = ('Vera Scene ' + self.name +
@@ -1031,7 +1032,33 @@ class VeraScene(object):
                   "result of vera_request with payload %s: %s",
                   payload, result.text)
 
+        self._active = True
+
+    def update(self, params):
+        self._active = params['active'] == 1
+
+    def refresh(self):
+        """Refresh the data used by get_value.
+
+        Only needed if you're not using subscriptions.
+        """
+        j = self.vera_request(id='sdata', output_format='json').json()
+        scenes = j.get('scenes')
+        for scene_data in scenes:
+            if scene_data.get('id') == self.scene_id:
+                self.update(scene_data)
+
+    @property
+    def is_active(self):
+        """Is Scene active."""
+        return self._active
+
     @property
     def vera_scene_id(self):
         """The ID Vera uses to refer to the scene."""
         return self.scene_id
+
+    @property
+    def should_poll(self):
+        """Whether polling is needed if using subscriptions for this device."""
+        return True
