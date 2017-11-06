@@ -982,7 +982,15 @@ class VeraSceneController(VeraDevice):
 
 
 class VeraScene(object):
-    """Class to represent a scene that can be activated."""
+    """Class to represent a scene that can be activated.
+
+    This does not inherit from a VeraDevice since scene ids
+    and device ids are separate sets.  A scene is not a device
+    as far as Vera is concerned.
+
+    TODO: The duplicated code between VeraScene & VeraDevice should
+    be refactored at some point to be reused.  Perhaps a VeraObject?
+    """
 
     def __init__(self, json_obj, vera_controller):
         """Setup a Vera scene."""
