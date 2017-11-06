@@ -70,6 +70,7 @@ class VeraController(object):
         """
         self.base_url = base_url
         self.devices = []
+        self.scenes = []
         self.temperature_units = 'C'
         self.version = None
         self.model = None
@@ -88,6 +89,12 @@ class VeraController(object):
         """Get basic device info from Vera."""
         j = self.data_request({'id': 'sdata'}).json()
 
+        self.scenes = []
+        items = j.get('scenes')
+
+        for item in items:
+            self.scenes.append(VeraScene(item, self))
+
         if j.get('temperature'):
             self.temperature_units = j.get('temperature')
 
@@ -103,6 +110,13 @@ class VeraController(object):
         for dev in devs:
             dev['categoryName'] = self.categories.get(dev.get('category'))
             self.device_id_map[dev.get('id')] = dev
+
+    def get_scenes(self):
+        """Get list of scenes."""
+
+        self.get_simple_devices_info()
+
+        return self.scenes
 
     def get_devices(self, category_filter=''):
         """Get list of connected devices.
@@ -964,4 +978,95 @@ class VeraSceneController(VeraDevice):
 
     @property
     def should_poll(self):
+        return True
+
+
+class VeraScene(object):
+    """Class to represent a scene that can be activated.
+
+    This does not inherit from a VeraDevice since scene ids
+    and device ids are separate sets.  A scene is not a device
+    as far as Vera is concerned.
+
+    TODO: The duplicated code between VeraScene & VeraDevice should
+    be refactored at some point to be reused.  Perhaps a VeraObject?
+    """
+
+    def __init__(self, json_obj, vera_controller):
+        """Setup a Vera scene."""
+        self.json_state = json_obj
+        self.scene_id = self.json_state.get('id')
+        self.vera_controller = vera_controller
+        self.name = self.json_state.get('name')
+        self._active = False
+
+        if not self.name:
+            self.name = ('Vera Scene ' + self.name +
+                         ' ' + str(self.scene_id))
+
+    def __repr__(self):
+        return "{} (id={} name={})".format(
+            self.__class__.__name__,
+            self.scene_id,
+            self.name)
+
+    @property
+    def scene_service(self):
+        """Vera service string for switch."""
+        return 'urn:micasaverde-com:serviceId:HomeAutomationGateway1'
+
+    def vera_request(self, **kwargs):
+        """Perfom a vera_request for this scene."""
+        request_payload = {
+            'output_format': 'json',
+            'SceneNum': self.scene_id,
+        }
+        request_payload.update(kwargs)
+
+        return self.vera_controller.data_request(request_payload)
+
+    def activate(self):
+        """Activate a Vera scene.
+
+        This will call the Vera api to activate a scene.
+        """
+        payload = {
+            'id': 'lu_action',
+            'action': 'RunScene',
+            'serviceId': self.scene_service
+        }
+        result = self.vera_request(**payload)
+        LOG.debug("activate: "
+                  "result of vera_request with payload %s: %s",
+                  payload, result.text)
+
+        self._active = True
+
+    def update(self, params):
+        self._active = params['active'] == 1
+
+    def refresh(self):
+        """Refresh the data used by get_value.
+
+        Only needed if you're not using subscriptions.
+        """
+        j = self.vera_request(id='sdata', output_format='json').json()
+        scenes = j.get('scenes')
+        for scene_data in scenes:
+            if scene_data.get('id') == self.scene_id:
+                self.update(scene_data)
+
+    @property
+    def is_active(self):
+        """Is Scene active."""
+        return self._active
+
+    @property
+    def vera_scene_id(self):
+        """The ID Vera uses to refer to the scene."""
+        return self.scene_id
+
+    @property
+    def should_poll(self):
+        """Whether polling is needed if using subscriptions for this device."""
         return True
