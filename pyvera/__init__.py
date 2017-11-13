@@ -9,6 +9,20 @@ import sys
 
 from .subscribe import SubscriptionRegistry
 
+
+# activate to see raw http requests
+debug=0
+if debug:
+    import httplib as http_client
+    http_client.HTTPConnection.debuglevel = 1
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.DEBUG)
+    requests_log = logging.getLogger("requests.packages.urllib3")
+    requests_log.setLevel(logging.DEBUG)
+    requests_log.propagate = True
+
+
+
 __author__ = 'jamespcole'
 
 # Time to block on Vera poll if there are no changes in seconds
