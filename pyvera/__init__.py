@@ -5,8 +5,23 @@ This lib is designed to simplify communication with Vera controllers
 """
 import logging
 import requests
+import sys
 
 from .subscribe import SubscriptionRegistry
+
+
+# activate to see raw http requests
+debug=0
+if debug:
+    import httplib as http_client
+    http_client.HTTPConnection.debuglevel = 1
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.DEBUG)
+    requests_log = logging.getLogger("requests.packages.urllib3")
+    requests_log.setLevel(logging.DEBUG)
+    requests_log.propagate = True
+
+
 
 __author__ = 'jamespcole'
 
@@ -284,11 +299,19 @@ class VeraDevice(object):  # pylint: disable=R0904
                 self.name = 'Vera Device ' + str(self.device_id)
 
     def __repr__(self):
-        return "{} (id={} category={} name={})".format(
-            self.__class__.__name__,
-            self.device_id,
-            self.category_name,
-            self.name)
+        if sys.version_info >= (3, 0):
+            return "{} (id={} category={} name={})".format(
+                self.__class__.__name__,
+                self.device_id,
+                self.category_name,
+                self.name)
+        else:
+            return u"{} (id={} category={} name={})".format(
+                self.__class__.__name__,
+                self.device_id,
+                self.category_name,
+                self.name).encode('utf-8')
+
 
     @property
     def switch_service(self):
@@ -1005,10 +1028,16 @@ class VeraScene(object):
                          ' ' + str(self.scene_id))
 
     def __repr__(self):
-        return "{} (id={} name={})".format(
-            self.__class__.__name__,
-            self.scene_id,
-            self.name)
+        if sys.version_info >= (3, 0):
+            return "{} (id={} name={})".format(
+                self.__class__.__name__,
+                self.scene_id,
+                self.name)
+        else:
+            return u"{} (id={} name={})".format(
+                self.__class__.__name__,
+                self.scene_id,
+                self.name).encode('utf-8')
 
     @property
     def scene_service(self):
