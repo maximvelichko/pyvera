@@ -284,11 +284,18 @@ class VeraDevice(object):  # pylint: disable=R0904
                 self.name = 'Vera Device ' + str(self.device_id)
 
     def __repr__(self):
-        return "{} (id={} category={} name={})".format(
-            self.__class__.__name__,
-            self.device_id,
-            self.category_name,
-            self.name)
+        if sys.version_info >= (3, 0):
+            return "{} (id={} category={} name={})".format(
+                self.__class__.__name__,
+                self.device_id,
+                self.category_name,
+                self.name)
+        else:
+            return u"{} (id={} category={} name={})".format(
+                self.__class__.__name__,
+                self.device_id,
+                self.category_name,
+                self.name).encode('utf-8')
 
     @property
     def switch_service(self):
@@ -1005,10 +1012,16 @@ class VeraScene(object):
                          ' ' + str(self.scene_id))
 
     def __repr__(self):
-        return "{} (id={} name={})".format(
-            self.__class__.__name__,
-            self.scene_id,
-            self.name)
+        if sys.version_info >= (3, 0):
+            return "{} (id={} name={})".format(
+                self.__class__.__name__,
+                self.scene_id,
+                self.name)
+        else:
+            return u"{} (id={} name={})".format(
+                self.__class__.__name__,
+                self.scene_id,
+                self.name).encode('utf-8')
 
     @property
     def scene_service(self):
