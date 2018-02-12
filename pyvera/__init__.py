@@ -30,6 +30,7 @@ CATEGORY_HUMIDITY_SENSOR = 16
 CATEGORY_TEMPERATURE_SENSOR = 17
 CATEGORY_LIGHT_SENSOR = 18
 CATEGORY_POWER_METER = 21
+CATEGORY_VERA_SIREN = 24
 CATEGORY_UV_SENSOR = 28
 
 _VERA_CONTROLLER = None
@@ -141,7 +142,8 @@ class VeraController(object):
                 device_category = item.get('deviceInfo').get('category')
                 if device_category == CATEGORY_DIMMER:
                     device = VeraDimmer(item, self)
-                elif device_category == CATEGORY_SWITCH:
+                elif ( device_category == CATEGORY_SWITCH or
+                       device_category == CATEGORY_VERA_SIREN):
                     device = VeraSwitch(item, self)
                 elif device_category == CATEGORY_THERMOSTAT:
                     device = VeraThermostat(item, self)
@@ -163,7 +165,9 @@ class VeraController(object):
                 else:
                     device = VeraDevice(item, self)
                 self.devices.append(device)
-                if device_category != CATEGORY_SWITCH and device.is_armable:
+                if (device.is_armable and not (
+                    device_category == CATEGORY_SWITCH or
+                    device_category == CATEGORY_VERA_SIREN)):
                     self.devices.append(VeraArmableDevice(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
