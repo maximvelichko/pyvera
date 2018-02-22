@@ -6,6 +6,7 @@ This lib is designed to simplify communication with Vera controllers
 import logging
 import requests
 import sys
+import json
 
 from .subscribe import SubscriptionRegistry
 
@@ -241,9 +242,30 @@ class VeraController(object):
         payload.update({
             'id': 'lu_sdata',
         })
-        result = self.data_request(payload, TIMEOUT*2).json()
-        device_data = result.get('devices')
+        
+        LOG.debug("get_changed_devices() requesting payload %s", str(payload))
+        r = self.data_request(payload, TIMEOUT*2)
+        r.raise_for_status()
 
+        # Unfortunately, not all JSON implementations return the well-known
+        # json.decoder.JSONDecodeError, so attempt to trap and raise what
+        # the poller expects.
+        try:
+            result = r.json()
+        except json.decoder.JSONDecodeError:
+            raise # pass it up
+        except Exception as ex:
+            raise requests.RequestException("JSON decode error: " + str(ex))
+
+        if not ( type(result) is dict 
+                 and 'loadtime' in result and 'dataversion' in result ):
+            LOG.debug("Unexpected or empty response from Vera: %s",
+                      str(result))
+            # Return empty response with unmodified timestamp for retry.
+            return [ None, timestamp ]
+            
+        # At this point, all good. Update timestamp and return change data.
+        device_data = result.get('devices')
         timestamp = {
             'loadtime': result.get('loadtime'),
             'dataversion': result.get('dataversion')

@@ -123,23 +123,33 @@ class SubscriptionRegistry(object):
                 device_data, timestamp = (
                     controller.get_changed_devices(timestamp))
                 LOG.debug("Poll returned")
+
                 if self._exiting:
                     continue
-                if not device_data:
+
+                if device_data:
+                    self._event(device_data)
+                else:
                     LOG.debug("No changes in poll interval")
-                    continue
-                self._event(device_data)
-                time.sleep(1)
-            except requests.RequestException:
-                LOG.info("Could not contact Vera - will retry in %ss",
-                         SUBSCRIPTION_RETRY)
-                time.sleep(SUBSCRIPTION_RETRY)
-            except json.decoder.JSONDecodeError:
-                LOG.info("Response was malfomed - will retry in %ss",
-                         SUBSCRIPTION_RETRY)
-                time.sleep(SUBSCRIPTION_RETRY)
+
+                continue
+
+            except requests.RequestException as ex:
+                LOG.debug("Caught RequestException: %s", str(ex))
+                pass
+
+            except json.decoder.JSONDecodeError as ex:
+                LOG.debug("Caught JSONDecodeError: %s", str(ex))
+                pass
+
             except Exception as ex:
-                LOG.exception("Vera thread exception %s", ex)
-                raise
+                LOG.exception("Vera poll thread general exception: %s", 
+                              str(ex))
+                # Don't raise. Stay in control
+                #raise
+
+            LOG.info("Could not contact Vera - will retry in %ss",
+                     SUBSCRIPTION_RETRY)
+            time.sleep(SUBSCRIPTION_RETRY)
 
         LOG.info("Shutdown Vera Poll Thread")
