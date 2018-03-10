@@ -25,9 +25,7 @@ STATE_NOT_PRESENT = 999
 LOG = logging.getLogger(__name__)
 
 class PyveraError(Exception):
-    def __init__(self, arg):
-        self.strerror = arg
-        self.args = {arg}
+    pass
     
 class SubscriptionRegistry(object):
     """Class for subscribing to wemo events."""
