@@ -9,6 +9,7 @@ import sys
 import json
 
 from .subscribe import SubscriptionRegistry
+from .subscribe import PyveraError
 
 __author__ = 'jamespcole'
 
@@ -247,22 +248,25 @@ class VeraController(object):
         r = self.data_request(payload, TIMEOUT*2)
         r.raise_for_status()
 
-        # Unfortunately, not all JSON implementations return the well-known
-        # json.decoder.JSONDecodeError, so attempt to trap and raise what
-        # the poller expects.
+        # If the Vera disconnects before writing a full response (as lu_sdata 
+        # will do when interrupted by a Luup reload), the requests module will 
+        # happily return 200 with an empty string. So, test for empty response,
+        # so we don't rely on the JSON parser to throw an exception.
+        if r.text == "":
+            raise PyveraError("Empty response from Vera")
+            
+        # Catch a wide swath of what the JSON parser might throw, within
+        # reason. Unfortunately, some parsers don't specifically return 
+        # json.decode.JSONDecodeError, but so far most seem to derive what
+        # they do throw from ValueError, so that's helpful.
         try:
             result = r.json()
-        except json.decoder.JSONDecodeError:
-            raise # pass it up
-        except Exception as ex:
-            raise requests.RequestException("JSON decode error: " + str(ex))
+        except ValueError as ex:
+            raise PyveraError("JSON decode error: " + str(ex))
 
         if not ( type(result) is dict 
                  and 'loadtime' in result and 'dataversion' in result ):
-            LOG.debug("Unexpected or empty response from Vera: %s",
-                      str(result))
-            # Return empty response with unmodified timestamp for retry.
-            return [ None, timestamp ]
+            raise PyveraError("Unexpected/garbled response from Vera")
             
         # At this point, all good. Update timestamp and return change data.
         device_data = result.get('devices')
