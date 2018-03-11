@@ -24,7 +24,9 @@ STATE_NOT_PRESENT = 999
 
 LOG = logging.getLogger(__name__)
 
-
+class PyveraError(Exception):
+    pass
+    
 class SubscriptionRegistry(object):
     """Class for subscribing to wemo events."""
 
@@ -95,7 +97,15 @@ class SubscriptionRegistry(object):
             return
         device.update(device_data)
         for callback in self._callbacks.get(device, ()):
-            callback(device)
+            try:
+                callback(device)
+            except:
+                # (Very) broad check to not let loosely-implemented callbacks
+                # kill our polling thread. They should be catching their own
+                # errors, so if it gets back to us, just log it and move on.
+                LOG.exception(
+                    "Unhandled exception in callback for device #%s (%s)",
+                    str(device.device_id), device.name)
 
     def join(self):
         """Don't allow the main thread to terminate until we have."""
@@ -120,26 +130,32 @@ class SubscriptionRegistry(object):
         timestamp = None
         while not self._exiting:
             try:
+                LOG.debug("Polling for Vera changes")
                 device_data, timestamp = (
                     controller.get_changed_devices(timestamp))
-                LOG.debug("Poll returned")
-                if self._exiting:
-                    continue
-                if not device_data:
-                    LOG.debug("No changes in poll interval")
-                    continue
-                self._event(device_data)
-                time.sleep(1)
-            except requests.RequestException:
-                LOG.info("Could not contact Vera - will retry in %ss",
-                         SUBSCRIPTION_RETRY)
-                time.sleep(SUBSCRIPTION_RETRY)
-            except json.decoder.JSONDecodeError:
-                LOG.info("Response was malfomed - will retry in %ss",
-                         SUBSCRIPTION_RETRY)
-                time.sleep(SUBSCRIPTION_RETRY)
+            except requests.RequestException as ex:
+                LOG.debug("Caught RequestException: %s", str(ex))
+                pass
+            except PyveraError as ex:
+                LOG.debug("Non-fatal error in poll: %s", str(ex))
+                pass
             except Exception as ex:
-                LOG.exception("Vera thread exception %s", ex)
+                LOG.exception("Vera poll thread general exception: %s", 
+                    str(ex))
                 raise
+            else:
+                LOG.debug("Poll returned")
+                if not self._exiting:
+                    if device_data:
+                        self._event(device_data)
+                    else:
+                        LOG.debug("No changes in poll interval")
+                    time.sleep(1)
+                   
+                continue
+
+            LOG.info("Could not poll Vera - will retry in %ss",
+                     SUBSCRIPTION_RETRY)
+            time.sleep(SUBSCRIPTION_RETRY)
 
         LOG.info("Shutdown Vera Poll Thread")
