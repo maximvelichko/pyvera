@@ -466,8 +466,13 @@ class VeraDevice(object):  # pylint: disable=R0904
 
         This data is updated by the subscription service.
         """
+        return self.get_strict_value(name.lower())
+
+    def get_strict_value(self, name):
+        """Get a case-sensitive keys value from the dev_info area.
+        """
         dev_info = self.json_state.get('deviceInfo')
-        return dev_info.get(name.lower(), None)
+        return dev_info.get(name, None)
 
     def refresh_complex_value(self, name):
         """Refresh a value from the service dictionaries.
@@ -589,8 +594,18 @@ class VeraDevice(object):  # pylint: disable=R0904
 
     @property
     def energy(self):
-        """Energy useage in kwh"""
+        """Energy usage in kwh"""
         return self.get_value('kwh')
+
+    @property
+    def room_id(self):
+        """Vera Room ID"""
+        return self.get_value('room')
+
+    @property
+    def comm_failure(self):
+        """Communication Failure Flag"""
+        return self.get_strict_value('commFailure') != '0'
 
     @property
     def vera_device_id(self):
@@ -878,10 +893,89 @@ class VeraLock(VeraDevice):
         Refresh data from Vera if refresh is True, otherwise use local cache.
         Refresh is only needed if you're not using subscriptions.
         """
+        try:
+            if refresh:
+                self.refresh()
+            return self.get_value("locked") == '1'
+        except (TypeError, ValueError):
+            # Try the complex value version if the other fails
+            if refresh:
+                self.refresh_complex_value('Status')
+            val = self.get_complex_value('Status')
+            return val == '1'
+
+    def get_last_user(self, refresh=False):
+        """Get the last used PIN user id"""
         if refresh:
-            self.refresh_complex_value('Status')
-        val = self.get_complex_value('Status')
-        return val == '1'
+            self.refresh_complex_value('sl_UserCode')
+        val = self.get_complex_value("sl_UserCode")
+        # Syntax string: UserID="<pin_slot>" UserName="<pin_code_name>"
+        # See http://wiki.micasaverde.com/index.php/Luup_UPnP_Variables_and_Actions#DoorLock1
+
+        # Get the UserID="" and UserName="" fields separately
+        raw_userid, raw_username = val.split(' ')
+        # Get the right hand value without quotes of UserID="<here>"
+        userid = raw_userid.split('=')[1].split('"')[1]
+        # Get the right hand value without quotes of UserName="<here>"
+        username = raw_username.split('=')[1].split('"')[1]
+
+        return ( userid, username )
+
+    def get_pin_failed(self, refresh=False):
+        """True when a bad PIN code was entered"""
+        if refresh:
+            self.refresh_complex_value('sl_PinFailed')
+        return self.get_complex_value("sl_PinFailed") == '1'
+
+    def get_unauth_user(self, refresh=False):
+        """True when a user code entered was outside of a valid date"""
+        if refresh:
+            self.refresh_complex_value('sl_UnauthUser')
+        return self.get_complex_value("sl_UnauthUser") == '1'
+
+    def get_lock_failed(self, refresh=False):
+        """True when the lock fails to operate"""
+        if refresh:
+            self.refresh_complex_value('sl_LockFailure')
+        return self.get_complex_value("sl_LockFailure") == '1'
+
+    def get_pin_codes(self, refresh=False):
+        """Get the list of PIN codes"""
+        try:
+            if refresh:
+                self.refresh()
+            val = self.get_value("pincodes")
+        except (TypeError, ValueError):
+            # Try the complex value version if the other fails
+            if refresh:
+                self.refresh_complex_value('PinCodes')
+            val = self.get_complex_value('PinCodes')
+
+        # Syntax string: <VERSION=3>next_available_user_code_id\tuser_code_id,active,date_added,date_used,PIN_code,name;\t...
+        # See (outdated) http://wiki.micasaverde.com/index.php/Luup_UPnP_Variables_and_Actions#DoorLock1
+
+        # Remove the trailing tab
+        # ignore the version and next available at the start
+        # and split out each set of code attributes
+        raw_code_list = val.rstrip().split('\t')[1:]
+
+        # Loop to create a list of codes
+        codes = []
+        for code in raw_code_list:
+
+          # Strip off trailing semicolon
+          # Create a list from csv
+          code_addrs = code.split(';')[0].split(',')
+
+          # Get the code ID (slot) and see if it should have values
+          slot, active = code_addrs[:2]
+          if active != '0':
+            # Since it has additional attributes, get the remaining ones
+            _, _, pin, name = code_addrs[2:]
+            # And add them as a tuple to the list
+            codes.append((slot, name, pin))
+        
+        return codes
 
     @property
     def should_poll(self):
