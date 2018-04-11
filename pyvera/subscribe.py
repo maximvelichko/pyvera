@@ -154,7 +154,7 @@ class SubscriptionRegistry(object):
 
                 continue
 
-            # After error, discard timestamp for fresh update.
+            # After error, discard timestamp for fresh update. pyvera issue #89
             timestamp = None
             LOG.info("Could not poll Vera - will retry in %ss",
                      SUBSCRIPTION_RETRY)
