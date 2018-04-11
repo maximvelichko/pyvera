@@ -26,7 +26,7 @@ LOG = logging.getLogger(__name__)
 
 class PyveraError(Exception):
     pass
-    
+
 class SubscriptionRegistry(object):
     """Class for subscribing to wemo events."""
 
@@ -140,7 +140,7 @@ class SubscriptionRegistry(object):
                 LOG.debug("Non-fatal error in poll: %s", str(ex))
                 pass
             except Exception as ex:
-                LOG.exception("Vera poll thread general exception: %s", 
+                LOG.exception("Vera poll thread general exception: %s",
                     str(ex))
                 raise
             else:
@@ -151,9 +151,11 @@ class SubscriptionRegistry(object):
                     else:
                         LOG.debug("No changes in poll interval")
                     time.sleep(1)
-                   
+
                 continue
 
+            # After error, discard timestamp for fresh update.
+            timestamp = None
             LOG.info("Could not poll Vera - will retry in %ss",
                      SUBSCRIPTION_RETRY)
             time.sleep(SUBSCRIPTION_RETRY)
