@@ -28,6 +28,13 @@ How to use
 
     >>> devices[1].switch_off()
 
+Debugging
+-------
+You may use the PYVERA_LOGLEVEL environment variable to output more verbose messages to the console.  For instance, to show all debug level messages using the list-devices implementation in the example directory, run something similar to:
+~~~~
+$ PYVERA_LOGLEVEL=DEBUG ./examples/list-devices.py -u http://192.168.1.l61:3480
+~~~~
+
 License
 -------
 The initial code was initially was written by James Cole and released under the BSD license. The rest is released under the MIT license.
