@@ -251,7 +251,7 @@ class VeraController(object):
         payload.update({
             'id': 'lu_sdata',
         })
-        
+
         logger.debug("get_changed_devices() requesting payload %s", str(payload))
         r = self.data_request(payload, TIMEOUT*2)
         r.raise_for_status()
