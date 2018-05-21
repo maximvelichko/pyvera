@@ -29,7 +29,7 @@ def device_info_callback(vera_device):
 controller, _ = pyvera.init_controller(args.url)
 
 try:
-    # Get a list of all the devices on the vera controller
+    # Get the requested device on the vera controller
     found_device = None
     if args.name is not None:
         found_device = controller.get_device_by_name(args.name)
