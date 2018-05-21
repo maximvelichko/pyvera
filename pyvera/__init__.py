@@ -122,6 +122,44 @@ class VeraController(object):
 
         return self.scenes
 
+    def get_device_by_name(self, device_name):
+        """Search the list of connected devices by name.
+
+        device_name param is the string name of the device
+        """
+
+        # Find the device for the vera device name we are interested in
+        found_device = None
+        for device in self.get_devices():
+            if device.name == device_name:
+              found_device = device
+              # found the first (and should be only) one so we will finish
+              break
+
+        if found_device is None:
+            logger.debug('Did not find device with {}'.format(device_name))
+
+        return found_device
+
+    def get_device_by_id(self, device_id):
+        """Search the list of connected devices by ID.
+
+        device_id param is the integer ID of the device
+        """
+
+        # Find the device for the vera device name we are interested in
+        found_device = None
+        for device in self.get_devices():
+            if device.device_id == device_id:
+              found_device = device
+              # found the first (and should be only) one so we will finish
+              break
+
+        if found_device is None:
+            logger.debug('Did not find device with {}'.format(device_id))
+
+        return found_device
+
     def get_devices(self, category_filter=''):
         """Get list of connected devices.
 
@@ -288,6 +326,10 @@ class VeraController(object):
         """Register a device and callback with the subscription service."""
         self.subscription_registry.register(device, callback)
 
+    def unregister(self, device, callback):
+        """Unregister a device and callback with the subscription service."""
+        self.subscription_registry.unregister(device, callback)
+
 
 class VeraDevice(object):  # pylint: disable=R0904
     """ Class to represent each vera device."""
@@ -440,7 +482,7 @@ class VeraDevice(object):  # pylint: disable=R0904
         """Set a variable in the local complex state dictionary.
 
         This does not change the physical device. Useful if you want the
-        device state to refect a new value which has not yet updated drom
+        device state to refect a new value which has not yet updated from
         Vera.
         """
         for item in self.json_state.get('states'):
@@ -457,6 +499,13 @@ class VeraDevice(object):  # pylint: disable=R0904
             if item.get('variable') == name:
                 return item.get('value')
         return None
+
+    def get_all_values(self):
+        """Get all values from the deviceInfo area.
+
+        The deviceInfo data is updated by the subscription service.
+        """
+        return self.json_state.get('deviceInfo')
 
     def get_value(self, name):
         """Get a value from the dev_info area.
