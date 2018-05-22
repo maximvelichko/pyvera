@@ -8,6 +8,7 @@ import requests
 import sys
 import json
 import os
+import threading
 
 from .subscribe import SubscriptionRegistry
 from .subscribe import PyveraError
@@ -20,6 +21,8 @@ SUBSCRIPTION_WAIT = 30
 SUBSCRIPTION_MIN_WAIT = 200
 # Timeout for requests calls, as vera sometimes just sits on sockets.
 TIMEOUT = SUBSCRIPTION_WAIT
+# VeraLock set target timeout in seconds
+LOCK_TARGET_TIMEOUT = 30
 
 CATEGORY_DIMMER = 2
 CATEGORY_SWITCH = 3
@@ -879,6 +882,12 @@ class VeraCurtain(VeraSwitch):
 class VeraLock(VeraDevice):
     """Class to represent a door lock."""
 
+    # target locked state
+    # this is used since sdata does not return proper job status for locks
+    lock_target = None
+    # target locked state fallback timer
+    lock_target_timer = None
+
     def set_lock_state(self, state):
         """Set the lock state, also update local state."""
         self.set_service_value(
@@ -886,6 +895,39 @@ class VeraLock(VeraDevice):
             'Target',
             'newTargetValue',
             state)
+        #TODO should we set the cache and assume lock will complete later?
+        #self.set_cache_value('locked', state)
+        self.finish_last_target_lock()
+        self.start_target_lock(state)
+
+    def start_target_lock(self, state):
+        """Starts a lock timer for a target."""
+        logger.debug('Watching for a new lock target: {}'.format(state))
+        self.lock_target = state
+        self.lock_target_timer = threading.Timer(LOCK_TARGET_TIMEOUT, self.resolve_target_state)
+        self.lock_target_timer.start()
+
+    def finish_last_target_lock(self):
+        """Cancels the lock timer and resets lock progress."""
+        logger.debug('Done with lock target: {}'.format(self.lock_target))
+        self.lock_target = None
+        if self.lock_target_timer:
+            self.lock_target_timer.cancel()
+        self.lock_target_timer = None
+
+    def resolve_target_state(self):
+        """Callback to run if we timeout trying to lock."""
+        logger.error('Timeout reached waiting lock to complete, timeout={}s'.format(LOCK_TARGET_TIMEOUT))
+        self.lock_target = None
+
+    def lock_progress_complete(self, device_data):
+        """Checks to see if we have a lock in progress."""
+        if self.lock_target is not None:
+            if int(self.lock_target) == int(device_data.get('locked')):
+                self.finish_last_target_lock()
+                return True
+            return False
+        return True
 
     def lock(self):
         """Lock the door."""

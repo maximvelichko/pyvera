@@ -76,8 +76,13 @@ class SubscriptionRegistry(object):
             state = STATE_JOB_WAITING_TO_START
         if (state == STATE_JOB_IN_PROGRESS and
                 device.__class__.__name__ == 'VeraLock'):
-            # VeraLocks don't complete - so force state
+            # VeraLocks don't complete locking - so detect if we are done
             state = STATE_JOB_DONE
+            # prevent updates if we are still trying to lock
+            if not device.lock_progress_complete(device_data):
+                LOG.debug('Lock still in progress')
+                state = STATE_JOB_IN_PROGRESS
+
         if (
                 state == STATE_JOB_WAITING_TO_START or
                 state == STATE_JOB_IN_PROGRESS or
