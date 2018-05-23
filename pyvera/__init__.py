@@ -42,10 +42,12 @@ _VERA_CONTROLLER = None
 logger = logging.getLogger(__name__)
 # Set logging level (such as INFO, DEBUG, etc) via an environment variable
 # Defaults to WARNING log level unless PYVERA_LOGLEVEL variable exists
-logger.setLevel(os.environ.get("PYVERA_LOGLEVEL", "WARNING"))
-ch = logging.StreamHandler()
-ch.setFormatter(logging.Formatter('%(levelname)s@{%(name)s:%(lineno)d} - %(message)s'))
-logger.addHandler(ch)
+logger_level = os.environ.get("PYVERA_LOGLEVEL", None)
+if logger_level:
+    logger.setLevel(logger_level)
+    ch = logging.StreamHandler()
+    ch.setFormatter(logging.Formatter('%(levelname)s@{%(name)s:%(lineno)d} - %(message)s'))
+    logger.addHandler(ch)
 logger.debug("DEBUG logging is ON")
 
 def init_controller(url):
