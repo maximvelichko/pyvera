@@ -28,11 +28,43 @@ How to use
 
     >>> devices[1].switch_off()
 
+
+Examples
+-------
+
+There is some example code (that can also help with tracing and debugging) in the `examples` directory.
+
+This will list your vera devices
+~~~~
+$ ./examples/list-devices.py -u http://192.168.1.l61:3480
+~~~~
+
+This will show you events on a particular device (get the id from the example above)
+~~~~
+$ ./examples/device-listener.py -u http://192.168.1.161:3480/  -i 26
+~~~~
+
+If you have locks - this will show you information about them.
+~~~~
+$ ./examples/show-lock-info.py -u http://192.168.1.161:3480/
+~~~~
+
 Debugging
 -------
 You may use the PYVERA_LOGLEVEL environment variable to output more verbose messages to the console.  For instance, to show all debug level messages using the list-devices implementation in the example directory, run something similar to:
 ~~~~
 $ PYVERA_LOGLEVEL=DEBUG ./examples/list-devices.py -u http://192.168.1.l61:3480
+~~~~
+
+Debugging inside home assistant
+-------
+If you're running pyvera inside home assistant and need the debugging log traces, add the following to your `configuration.yaml`
+
+
+~~~~
+logger:
+    logs:
+        pyvera: debug
 ~~~~
 
 License
