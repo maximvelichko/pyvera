@@ -91,12 +91,17 @@ class SubscriptionRegistry(object):
             state = STATE_JOB_WAITING_TO_START
         if (state == STATE_JOB_IN_PROGRESS and
                 device.__class__.__name__ == 'VeraLock'):
-            # VeraLocks don't complete locking - so detect if we are done
-            state = STATE_JOB_DONE
-            # prevent updates if we are still trying to lock
-            if not device.lock_progress_complete(device_data):
-                LOG.debug('Lock still in progress')
-                state = STATE_JOB_IN_PROGRESS
+            # VeraLocks don't complete
+            # so we detect if we are done from the comment field.
+            # This is really just a workaround for a vera bug
+            # and it does mean that a device name
+            # cannot contain the SUCCESS! string (very unlikely)
+            # since the name is also returned in the comment for
+            # some status messages
+            success = comment.find('SUCCESS!') >= 0
+            if success:
+                logger.debug('Lock success found, job is done')
+                state = STATE_JOB_DONE
 
         if (
                 state == STATE_JOB_WAITING_TO_START or
@@ -115,6 +120,7 @@ class SubscriptionRegistry(object):
                       state,
                       comment)
             return
+        logger.debug('########################################Updating {}: {}'.format(device.name, device_data))
         device.update(device_data)
         for callback in self._callbacks.get(device, ()):
             try:
