@@ -22,7 +22,8 @@ STATE_JOB_PENDING_DATA = 7
 
 STATE_NOT_PRESENT = 999
 
-LOG = logging.getLogger(__name__)
+# Get the logger for use in this module
+logger = logging.getLogger(__name__)
 
 class PyveraError(Exception):
     pass
@@ -44,12 +45,26 @@ class SubscriptionRegistry(object):
         callback: callback for notification of changes
         """
         if not device:
-            LOG.error("Received an invalid device: %r", device)
+            logger.error("Received an invalid device: %r", device)
             return
 
-        LOG.debug("Subscribing to events for %s", device.name)
+        logger.debug("Subscribing to events for %s", device.name)
         self._devices[device.vera_device_id].append(device)
-        self._callbacks[device].append((callback))
+        self._callbacks[device].append(callback)
+
+    def unregister(self, device, callback):
+        """Remove a registered a callback.
+
+        device: device that has the subscription
+        callback: callback used in original registration
+        """
+        if not device:
+            logger.error("Received an invalid device: %r", device)
+            return
+
+        logger.debug("Removing subscription for {}".format(device.name))
+        self._callbacks[device].remove(callback)
+        self._devices[device.vera_device_id].remove(device)
 
     def _event(self, device_data_list):
         for device_data in device_data_list:
@@ -68,7 +83,7 @@ class SubscriptionRegistry(object):
         state = int(device_data.get('state', STATE_NOT_PRESENT))
         comment = device_data.get('comment', '')
         sending = comment.find('Sending') >= 0
-        LOG.debug("Event: %s, state %s, %s",
+        logger.debug("Event: %s, state %s, %s",
                   device.name,
                   state,
                   json.dumps(device_data))
@@ -95,7 +110,7 @@ class SubscriptionRegistry(object):
                 state == STATE_NO_JOB or
                 (state == STATE_JOB_ERROR and
                     comment.find('Setting user configuration'))):
-            LOG.error("Device %s, state %s, %s",
+            logger.error("Device %s, state %s, %s",
                       device.name,
                       state,
                       comment)
@@ -108,7 +123,7 @@ class SubscriptionRegistry(object):
                 # (Very) broad check to not let loosely-implemented callbacks
                 # kill our polling thread. They should be catching their own
                 # errors, so if it gets back to us, just log it and move on.
-                LOG.exception(
+                logger.exception(
                     "Unhandled exception in callback for device #%s (%s)",
                     str(device.device_id), device.name)
 
@@ -127,7 +142,7 @@ class SubscriptionRegistry(object):
         """Tell the subscription thread to terminate."""
         self._exiting = True
         self.join()
-        LOG.info("Terminated thread")
+        logger.info("Terminated thread")
 
     def _run_poll_server(self):
         from pyvera import get_controller
@@ -135,34 +150,34 @@ class SubscriptionRegistry(object):
         timestamp = None
         while not self._exiting:
             try:
-                LOG.debug("Polling for Vera changes")
+                logger.debug("Polling for Vera changes")
                 device_data, timestamp = (
                     controller.get_changed_devices(timestamp))
             except requests.RequestException as ex:
-                LOG.debug("Caught RequestException: %s", str(ex))
+                logger.debug("Caught RequestException: %s", str(ex))
                 pass
             except PyveraError as ex:
-                LOG.debug("Non-fatal error in poll: %s", str(ex))
+                logger.debug("Non-fatal error in poll: %s", str(ex))
                 pass
             except Exception as ex:
-                LOG.exception("Vera poll thread general exception: %s",
+                logger.exception("Vera poll thread general exception: %s",
                     str(ex))
                 raise
             else:
-                LOG.debug("Poll returned")
+                logger.debug("Poll returned")
                 if not self._exiting:
                     if device_data:
                         self._event(device_data)
                     else:
-                        LOG.debug("No changes in poll interval")
+                        logger.debug("No changes in poll interval")
                     time.sleep(1)
 
                 continue
 
             # After error, discard timestamp for fresh update. pyvera issue #89
             timestamp = None
-            LOG.info("Could not poll Vera - will retry in %ss",
+            logger.info("Could not poll Vera - will retry in %ss",
                      SUBSCRIPTION_RETRY)
             time.sleep(SUBSCRIPTION_RETRY)
 
-        LOG.info("Shutdown Vera Poll Thread")
+        logger.info("Shutdown Vera Poll Thread")
