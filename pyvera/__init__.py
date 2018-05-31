@@ -8,7 +8,6 @@ import requests
 import sys
 import json
 import os
-import threading
 
 from .subscribe import SubscriptionRegistry
 from .subscribe import PyveraError
@@ -21,8 +20,6 @@ SUBSCRIPTION_WAIT = 30
 SUBSCRIPTION_MIN_WAIT = 200
 # Timeout for requests calls, as vera sometimes just sits on sockets.
 TIMEOUT = SUBSCRIPTION_WAIT
-# VeraLock set target timeout in seconds
-LOCK_TARGET_TIMEOUT = 30
 
 CATEGORY_DIMMER = 2
 CATEGORY_SWITCH = 3
