@@ -120,7 +120,6 @@ class SubscriptionRegistry(object):
                       state,
                       comment)
             return
-        logger.debug('########################################Updating {}: {}'.format(device.name, device_data))
         device.update(device_data)
         for callback in self._callbacks.get(device, ()):
             try:
