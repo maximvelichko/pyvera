@@ -30,6 +30,7 @@ CATEGORY_ARMABLE = 4
 CATEGORY_THERMOSTAT = 5
 CATEGORY_LOCK = 7
 CATEGORY_CURTAIN = 8
+CATEGORY_REMOTE = 9
 CATEGORY_SENSOR = 12
 CATEGORY_SCENE_CONTROLLER = 14
 CATEGORY_HUMIDITY_SENSOR = 16
@@ -213,7 +214,8 @@ class VeraController(object):
                       device_category == CATEGORY_POWER_METER or
                       device_category == CATEGORY_UV_SENSOR):
                     device = VeraSensor(item, self)
-                elif device_category == CATEGORY_SCENE_CONTROLLER:
+                elif (device_category == CATEGORY_SCENE_CONTROLLER or
+                      device_category == CATEGORY_REMOTE):
                     device = VeraSceneController(item, self)
                 else:
                     device = VeraDevice(item, self)
@@ -1177,7 +1179,8 @@ class VeraSceneController(VeraDevice):
         """
         if refresh:
             self.refresh_complex_value('LastSceneID')
-        val = self.get_complex_value('LastSceneID')
+            self.refresh_complex_value('sl_CentralScene')
+        val = self.get_complex_value('LastSceneID') or self.get_complex_value('sl_CentralScene')
         return val
 
     def get_last_scene_time(self, refresh=False):
