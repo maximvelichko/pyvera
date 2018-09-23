@@ -36,6 +36,7 @@ CATEGORY_LIGHT_SENSOR = 18
 CATEGORY_POWER_METER = 21
 CATEGORY_VERA_SIREN = 24
 CATEGORY_UV_SENSOR = 28
+CATEGORY_GARAGE_DOOR = 32
 
 _VERA_CONTROLLER = None
 
@@ -214,12 +215,15 @@ class VeraController(object):
                 elif (device_category == CATEGORY_SCENE_CONTROLLER or
                       device_category == CATEGORY_REMOTE):
                     device = VeraSceneController(item, self)
+                elif device_category == CATEGORY_GARAGE_DOOR:
+                    device = VeraGarageDoor(item, self)
                 else:
                     device = VeraDevice(item, self)
                 self.devices.append(device)
                 if (device.is_armable and not (
                     device_category == CATEGORY_SWITCH or
-                    device_category == CATEGORY_VERA_SIREN)):
+                    device_category == CATEGORY_VERA_SIREN or
+                    device_category == CATEGORY_GARAGE_DOOR)):
                     self.devices.append(VeraArmableDevice(item, self))
             else:
                 self.devices.append(VeraDevice(item, self))
@@ -1272,3 +1276,7 @@ class VeraScene(object):
     def should_poll(self):
         """Whether polling is needed if using subscriptions for this device."""
         return True
+
+
+class VeraGarageDoor(VeraSwitch):
+    pass
