@@ -223,6 +223,7 @@ class VeraController(object):
                 if (device.is_armable and not (
                     device_category == CATEGORY_SWITCH or
                     device_category == CATEGORY_VERA_SIREN or
+                    device_category == CATEGORY_CURTAIN or
                     device_category == CATEGORY_GARAGE_DOOR)):
                     self.devices.append(VeraArmableDevice(item, self))
             else:
