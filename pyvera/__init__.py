@@ -719,14 +719,6 @@ class VeraSwitch(VeraDevice):
 class VeraDimmer(VeraSwitch):
     """Class to add dimmer functionality."""
 
-    def switch_on(self):
-        """Turn the dimmer on."""
-        self.set_brightness(254)
-
-    def switch_off(self):
-        """Turn the dimmer off."""
-        self.set_brightness(0)
-
     def is_switched_on(self, refresh=False):
         """Get dimmer state.
 
