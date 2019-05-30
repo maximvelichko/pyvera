@@ -9,6 +9,7 @@ import sys
 import json
 import os
 import time
+from datetime import datetime
 
 from .subscribe import SubscriptionRegistry
 from .subscribe import PyveraError
@@ -54,6 +55,7 @@ if logger_level:
     ch.setFormatter(logging.Formatter('%(levelname)s@{%(name)s:%(lineno)d} - %(message)s'))
     logger.addHandler(ch)
 logger.debug("DEBUG logging is ON")
+
 
 def init_controller(url):
     """Initialize a controller.
@@ -190,47 +192,49 @@ class VeraController(object):
 
         self.devices = []
         items = j.get('devices')
+        alerts = j.get('alerts', ())
 
         for item in items:
             item['deviceInfo'] = self.device_id_map.get(item.get('id'))
+            item_alerts = [alert for alert in alerts if alert.get('PK_Device') == item.get('id')]
             if item.get('deviceInfo'):
                 device_category = item.get('deviceInfo').get('category')
                 if device_category == CATEGORY_DIMMER:
-                    device = VeraDimmer(item, self)
+                    device = VeraDimmer(item, item_alerts, self)
                 elif ( device_category == CATEGORY_SWITCH or
                        device_category == CATEGORY_VERA_SIREN):
-                    device = VeraSwitch(item, self)
+                    device = VeraSwitch(item, item_alerts, self)
                 elif device_category == CATEGORY_THERMOSTAT:
-                    device = VeraThermostat(item, self)
+                    device = VeraThermostat(item, item_alerts, self)
                 elif device_category == CATEGORY_LOCK:
-                    device = VeraLock(item, self)
+                    device = VeraLock(item, item_alerts, self)
                 elif device_category == CATEGORY_CURTAIN:
-                    device = VeraCurtain(item, self)
+                    device = VeraCurtain(item, item_alerts, self)
                 elif device_category == CATEGORY_ARMABLE:
-                    device = VeraBinarySensor(item, self)
+                    device = VeraBinarySensor(item, item_alerts, self)
                 elif (device_category == CATEGORY_SENSOR or
                       device_category == CATEGORY_HUMIDITY_SENSOR or
                       device_category == CATEGORY_TEMPERATURE_SENSOR or
                       device_category == CATEGORY_LIGHT_SENSOR or
                       device_category == CATEGORY_POWER_METER or
                       device_category == CATEGORY_UV_SENSOR):
-                    device = VeraSensor(item, self)
+                    device = VeraSensor(item, item_alerts, self)
                 elif (device_category == CATEGORY_SCENE_CONTROLLER or
                       device_category == CATEGORY_REMOTE):
-                    device = VeraSceneController(item, self)
+                    device = VeraSceneController(item, item_alerts, self)
                 elif device_category == CATEGORY_GARAGE_DOOR:
-                    device = VeraGarageDoor(item, self)
+                    device = VeraGarageDoor(item, item_alerts, self)
                 else:
-                    device = VeraDevice(item, self)
+                    device = VeraDevice(item, item_alerts, self)
                 self.devices.append(device)
                 if (device.is_armable and not (
                     device_category == CATEGORY_SWITCH or
                     device_category == CATEGORY_VERA_SIREN or
                     device_category == CATEGORY_CURTAIN or
                     device_category == CATEGORY_GARAGE_DOOR)):
-                    self.devices.append(VeraArmableDevice(item, self))
+                    self.devices.append(VeraArmableDevice(item, item_alerts, self))
             else:
-                self.devices.append(VeraDevice(item, self))
+                self.devices.append(VeraDevice(item, item_alerts, self))
 
         if not category_filter:
             return self.devices
@@ -289,19 +293,14 @@ class VeraController(object):
 
         This is done via a blocking call, pass NONE for initial state.
         """
-        if timestamp is None:
-            payload = {}
-        else:
-            payload = {
-                'timeout': SUBSCRIPTION_WAIT,
-                'minimumdelay': SUBSCRIPTION_MIN_WAIT
-            }
-            payload.update(timestamp)
-        # double the timeout here so requests doesn't timeout before vera
-        payload.update({
+        payload = {
+            'timeout': SUBSCRIPTION_WAIT,
+            'minimumdelay': SUBSCRIPTION_MIN_WAIT,
             'id': 'lu_sdata',
-        })
+        }
+        payload.update(timestamp)
 
+        # double the timeout here so requests doesn't timeout before vera
         logger.debug("get_changed_devices() requesting payload %s", str(payload))
         r = self.data_request(payload, TIMEOUT*2)
         r.raise_for_status()
@@ -334,6 +333,34 @@ class VeraController(object):
         }
         return [device_data, timestamp]
 
+    def get_alerts(self, timestamp):
+        """Get alerts that have triggered since last timestamp"""
+
+        payload = {
+            'LoadTime': timestamp['loadtime'],
+            'DataVersion': timestamp['dataversion'],
+            'id': 'status',
+        }
+
+        logger.debug('get_alerts() requesting payload %s', str(payload))
+        r = self.data_request(payload)
+        r.raise_for_status()
+
+        if r.text == "":
+            raise PyVeraError("Empty response from Vera")
+
+        try:
+            result = r.json()
+        except ValueError as ex:
+            raise PyVeraError("JSON decode error: " + str(ex))
+
+        if not ( type(result) is dict
+                 and 'LoadTime' in result and 'DataVersion' in result ):
+            raise PyveraError("Unexpected/garbled response from Vera")
+
+        return result.get('alerts', [])
+
+
     def start(self):
         """Start the subscription thread."""
         self.subscription_registry.start()
@@ -354,12 +381,13 @@ class VeraController(object):
 class VeraDevice(object):  # pylint: disable=R0904
     """ Class to represent each vera device."""
 
-    def __init__(self, json_obj, vera_controller):
+    def __init__(self, json_obj, json_alerts, vera_controller):
         """Setup a Vera device."""
         self.json_state = json_obj
         self.device_id = self.json_state.get('id')
         self.vera_controller = vera_controller
         self.name = ''
+        self.set_alerts(json_alerts)
 
         if self.json_state.get('deviceInfo'):
             self.category = self.json_state.get('deviceInfo').get('category')
@@ -561,6 +589,16 @@ class VeraDevice(object):  # pylint: disable=R0904
                 item['value'] = result.text
                 return item.get('value')
         return None
+
+    def set_alerts(self, json_alerts):
+        """Convert JSON alert data to VeraAlerts
+        """
+        self.alerts = [VeraAlert(json_alert, self) for json_alert in json_alerts]
+
+    def get_alerts(self):
+        """Get any alerts present during the most recent poll cycle
+        """
+        return self.alerts
 
     def refresh(self):
         """Refresh the dev_info data used by get_value.
@@ -1303,3 +1341,29 @@ class VeraScene(object):
 
 class VeraGarageDoor(VeraSwitch):
     pass
+
+
+class VeraAlert(object):
+    """An alert triggered by variable state change
+    """
+
+    def __init__(self, json_alert, device):
+        self.device = device
+        self.code = json_alert.get('Code')
+        self.severity = json_alert.get('Severity')
+        self.value = json_alert.get('NewValue')
+        self.timestamp = datetime.fromtimestamp(json_alert.get('LocalTimestamp', 0))
+
+    def __repr__(self):
+        if sys.version_info >= (3, 0):
+            return "{} (code={} value={} timestamp={})".format(
+                self.__class__.__name__,
+                self.code,
+                self.value,
+                self.timestamp)
+        else:
+            return u"{} (code={} value={} timestamp={})".format(
+                self.__class__.__name__,
+                self.code,
+                self.value,
+                self.timestamp).encode('utf-8')
