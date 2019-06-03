@@ -9,4 +9,5 @@ setup(name='pyvera',
       license='MIT',
       install_requires=['requests>=2.0'],
       packages=find_packages(),
+      test_suite="tests",
       zip_safe=True)

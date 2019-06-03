@@ -8,6 +8,7 @@ import requests
 import sys
 import json
 import os
+import time
 
 from .subscribe import SubscriptionRegistry
 from .subscribe import PyveraError
@@ -20,6 +21,8 @@ SUBSCRIPTION_WAIT = 30
 SUBSCRIPTION_MIN_WAIT = 200
 # Timeout for requests calls, as vera sometimes just sits on sockets.
 TIMEOUT = SUBSCRIPTION_WAIT
+# VeraLock set target timeout in seconds
+LOCK_TARGET_TIMEOUT_SEC = 30
 
 CATEGORY_DIMMER = 2
 CATEGORY_SWITCH = 3
@@ -180,7 +183,7 @@ class VeraController(object):
         # pylint: disable=too-many-branches
 
         # the Vera rest API is a bit rough so we need to make 2 calls to get
-        # all the info e need
+        # all the info we need
         self.get_simple_devices_info()
 
         j = self.data_request({'id': 'status', 'output_format': 'json'}).json()
@@ -484,7 +487,7 @@ class VeraDevice(object):  # pylint: disable=R0904
         """Set a variable in the local state dictionary.
 
         This does not change the physical device. Useful if you want the
-        device state to refect a new value which has not yet updated drom
+        device state to refect a new value which has not yet updated from
         Vera.
         """
         dev_info = self.json_state.get('deviceInfo')
@@ -937,6 +940,10 @@ class VeraCurtain(VeraSwitch):
 class VeraLock(VeraDevice):
     """Class to represent a door lock."""
 
+    # target locked (state, time)
+    # this is used since sdata does not return proper job status for locks
+    lock_target = None
+
     def set_lock_state(self, state):
         """Set the lock state, also update local state."""
         self.set_service_value(
@@ -944,6 +951,8 @@ class VeraLock(VeraDevice):
             'Target',
             'newTargetValue',
             state)
+        self.set_cache_value('locked', state)
+        self.lock_target = (str(state), time.time())
 
     def lock(self):
         """Lock the door."""
@@ -962,7 +971,20 @@ class VeraLock(VeraDevice):
         """
         if refresh:
             self.refresh()
-        return self.get_value("locked") == '1'
+
+        # if the lock target matches now
+        # or the locking action took too long
+        # then reset the target and time
+        now = time.time()
+        if self.lock_target is not None and (self.lock_target[0] == self.get_value("locked") or now - self.lock_target[1] >= LOCK_TARGET_TIMEOUT_SEC):
+            logger.debug("Resetting lock target for {} ({}=={}, {} - {} >= {})".format(self.name, self.lock_target[0], self.get_value("locked"), now, self.lock_target[1], LOCK_TARGET_TIMEOUT_SEC))
+            self.lock_target = None
+
+        locked = self.get_value("locked") == '1'
+        if self.lock_target is not None:
+            locked = self.lock_target[0] == '1'
+            logger.debug("Lock still in progress for {}: target={}".format(self.name, locked))
+        return locked
 
     def get_last_user(self, refresh=False):
         """Get the last used PIN user id"""
