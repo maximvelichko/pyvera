@@ -10,6 +10,7 @@ import pyvera
 
 import time
 
+
 # Parse Arguments
 import argparse
 parser = argparse.ArgumentParser(description='device-listener')
@@ -23,7 +24,8 @@ args = parser.parse_args()
 # Define a callback that runs each time a device changes state
 def device_info_callback(vera_device):
     # Do what we want with the changed device information
-    print('{}_{}: {}'.format(vera_device.name, vera_device.device_id, vera_device.get_all_values()))
+    print('{}_{} values: {}'.format(vera_device.name, vera_device.device_id, vera_device.get_all_values()))
+    print('{}_{} alerts: {}'.format(vera_device.name, vera_device.device_id, vera_device.get_alerts()))
 
 # Start the controller
 controller, _ = pyvera.init_controller(args.url)
@@ -44,6 +46,7 @@ try:
     # Register a callback that runs when the info for that device is updated
     controller.register(found_device, device_info_callback)
     print('Initial values: {}'.format(found_device.get_all_values()))
+    print('Initial alerts: {}'.format(found_device.get_alerts()))
 
     # Loop until someone hits Ctrl-C to interrupt the listener
     try:

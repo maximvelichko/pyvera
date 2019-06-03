@@ -52,8 +52,9 @@ class SubscriptionRegistry(object):
         self._devices[device.vera_device_id].append(device)
         self._callbacks[device].append(callback)
 
+
     def unregister(self, device, callback):
-        """Remove a registered a callback.
+        """Remove a registered change callback.
 
         device: device that has the subscription
         callback: callback used in original registration
@@ -66,16 +67,25 @@ class SubscriptionRegistry(object):
         self._callbacks[device].remove(callback)
         self._devices[device.vera_device_id].remove(device)
 
-    def _event(self, device_data_list):
-        for device_data in device_data_list:
-            device_id = device_data['id']
-            device_list = self._devices.get(int(device_id))
-            if device_list is None:
-                return
-            for device in device_list:
-                self._event_device(device, device_data)
 
-    def _event_device(self, device, device_data):
+    def _event(self, device_data_list, device_alert_list):
+        # Find unique device_ids that have data across both device_data and alert_data
+        device_ids = set()
+        [device_ids.add(int(device_data['id'])) for device_data in device_data_list]
+        [device_ids.add(int(alert_data['PK_Device'])) for alert_data in device_alert_list]
+
+        for device_id in device_ids:
+            device_list = self._devices.get(device_id, ())
+            device_datas = [data for data in device_data_list if int(data['id']) == device_id]
+            device_alerts = [alert for alert in device_alert_list if int(alert['PK_Device']) == device_id]
+
+            device_data = device_datas[0] if device_datas else {}
+
+            for device in device_list:
+                self._event_device(device, device_data, device_alerts)
+
+
+    def _event_device(self, device, device_data, device_alerts):
         if device is None:
             return
         # Vera can send an update status STATE_NO_JOB but
@@ -83,10 +93,12 @@ class SubscriptionRegistry(object):
         state = int(device_data.get('state', STATE_NOT_PRESENT))
         comment = device_data.get('comment', '')
         sending = comment.find('Sending') >= 0
-        logger.debug("Event: %s, state %s, %s",
+        logger.debug("Event: %s, state %s, alerts %s, %s",
                   device.name,
                   state,
+                  len(device_alerts),
                   json.dumps(device_data))
+        device.set_alerts(device_alerts)
         if sending and state == STATE_NO_JOB:
             state = STATE_JOB_WAITING_TO_START
         if (state == STATE_JOB_IN_PROGRESS and
@@ -152,12 +164,17 @@ class SubscriptionRegistry(object):
     def _run_poll_server(self):
         from pyvera import get_controller
         controller = get_controller()
-        timestamp = None
+        timestamp = {'dataversion': 1, 'loadtime': 0}
+        device_data = []
+        alert_data = []
         while not self._exiting:
             try:
                 logger.debug("Polling for Vera changes")
-                device_data, timestamp = (
+                device_data, new_timestamp = (
                     controller.get_changed_devices(timestamp))
+                if new_timestamp['dataversion'] != timestamp['dataversion']:
+                    alert_data = controller.get_alerts(timestamp)
+                timestamp = new_timestamp
             except requests.RequestException as ex:
                 logger.debug("Caught RequestException: %s", str(ex))
                 pass
@@ -171,8 +188,8 @@ class SubscriptionRegistry(object):
             else:
                 logger.debug("Poll returned")
                 if not self._exiting:
-                    if device_data:
-                        self._event(device_data)
+                    if device_data or alert_data:
+                        self._event(device_data, alert_data)
                     else:
                         logger.debug("No changes in poll interval")
                     time.sleep(1)
@@ -180,7 +197,7 @@ class SubscriptionRegistry(object):
                 continue
 
             # After error, discard timestamp for fresh update. pyvera issue #89
-            timestamp = None
+            timestamp = {'dataversion': 1, 'loadtime': 0}
             logger.info("Could not poll Vera - will retry in %ss",
                      SUBSCRIPTION_RETRY)
             time.sleep(SUBSCRIPTION_RETRY)
