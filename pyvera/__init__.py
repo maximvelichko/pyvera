@@ -326,10 +326,10 @@ class VeraController(object):
             raise PyveraError("Unexpected/garbled response from Vera")
 
         # At this point, all good. Update timestamp and return change data.
-        device_data = result.get('devices')
+        device_data = result.get('devices', [])
         timestamp = {
-            'loadtime': result.get('loadtime'),
-            'dataversion': result.get('dataversion')
+            'loadtime': result.get('loadtime', 0),
+            'dataversion': result.get('dataversion', 1)
         }
         return [device_data, timestamp]
 
