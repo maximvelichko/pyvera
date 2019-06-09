@@ -69,6 +69,12 @@ class SubscriptionRegistry(object):
 
 
     def _event(self, device_data_list, device_alert_list):
+        # Guard against invalid data from Vera API
+        if not isinstance(device_data_list, list):
+            device_data_list = []
+        if not isinstance(device_alert_list, list):
+            device_alert_list = []
+
         # Find unique device_ids that have data across both device_data and alert_data
         device_ids = set()
         [device_ids.add(int(device_data['id'])) for device_data in device_data_list]
@@ -167,6 +173,7 @@ class SubscriptionRegistry(object):
         timestamp = {'dataversion': 1, 'loadtime': 0}
         device_data = []
         alert_data = []
+        data_changed = False
         while not self._exiting:
             try:
                 logger.debug("Polling for Vera changes")
@@ -174,6 +181,9 @@ class SubscriptionRegistry(object):
                     controller.get_changed_devices(timestamp))
                 if new_timestamp['dataversion'] != timestamp['dataversion']:
                     alert_data = controller.get_alerts(timestamp)
+                    data_changed = True
+                else:
+                    data_changed = False
                 timestamp = new_timestamp
             except requests.RequestException as ex:
                 logger.debug("Caught RequestException: %s", str(ex))
@@ -188,7 +198,7 @@ class SubscriptionRegistry(object):
             else:
                 logger.debug("Poll returned")
                 if not self._exiting:
-                    if device_data or alert_data:
+                    if data_changed:
                         self._event(device_data, alert_data)
                     else:
                         logger.debug("No changes in poll interval")
