@@ -6,7 +6,6 @@ This lib is designed to simplify communication with Vera controllers
 import logging
 import requests
 import sys
-import json
 import os
 import time
 from datetime import datetime
@@ -149,9 +148,9 @@ class VeraController(object):
         found_device = None
         for device in self.get_devices():
             if device.name == device_name:
-              found_device = device
-              # found the first (and should be only) one so we will finish
-              break
+                found_device = device
+                # found the first (and should be only) one so we will finish
+                break
 
         if found_device is None:
             logger.debug('Did not find device with {}'.format(device_name))
@@ -168,9 +167,9 @@ class VeraController(object):
         found_device = None
         for device in self.get_devices():
             if device.device_id == device_id:
-              found_device = device
-              # found the first (and should be only) one so we will finish
-              break
+                found_device = device
+                # found the first (and should be only) one so we will finish
+                break
 
         if found_device is None:
             logger.debug('Did not find device with {}'.format(device_id))
@@ -201,8 +200,8 @@ class VeraController(object):
                 device_category = item.get('deviceInfo').get('category')
                 if device_category == CATEGORY_DIMMER:
                     device = VeraDimmer(item, item_alerts, self)
-                elif ( device_category == CATEGORY_SWITCH or
-                       device_category == CATEGORY_VERA_SIREN):
+                elif (device_category == CATEGORY_SWITCH or
+                      device_category == CATEGORY_VERA_SIREN):
                     device = VeraSwitch(item, item_alerts, self)
                 elif device_category == CATEGORY_THERMOSTAT:
                     device = VeraThermostat(item, item_alerts, self)
@@ -302,7 +301,7 @@ class VeraController(object):
 
         # double the timeout here so requests doesn't timeout before vera
         logger.debug("get_changed_devices() requesting payload %s", str(payload))
-        r = self.data_request(payload, TIMEOUT*2)
+        r = self.data_request(payload, TIMEOUT * 2)
         r.raise_for_status()
 
         # If the Vera disconnects before writing a full response (as lu_sdata
@@ -321,8 +320,9 @@ class VeraController(object):
         except ValueError as ex:
             raise PyveraError("JSON decode error: " + str(ex))
 
-        if not ( type(result) is dict
-                 and 'loadtime' in result and 'dataversion' in result ):
+        if not (type(result) is dict and
+                'loadtime' in result and
+                'dataversion' in result):
             raise PyveraError("Unexpected/garbled response from Vera")
 
         # At this point, all good. Update timestamp and return change data.
@@ -347,19 +347,19 @@ class VeraController(object):
         r.raise_for_status()
 
         if r.text == "":
-            raise PyVeraError("Empty response from Vera")
+            raise PyveraError("Empty response from Vera")
 
         try:
             result = r.json()
         except ValueError as ex:
-            raise PyVeraError("JSON decode error: " + str(ex))
+            raise PyveraError("JSON decode error: " + str(ex))
 
-        if not ( type(result) is dict
-                 and 'LoadTime' in result and 'DataVersion' in result ):
+        if not (type(result) is dict and
+                'LoadTime' in result and
+                'DataVersion' in result):
             raise PyveraError("Unexpected/garbled response from Vera")
 
         return result.get('alerts', [])
-
 
     def start(self):
         """Start the subscription thread."""
@@ -496,8 +496,8 @@ class VeraDevice(object):  # pylint: disable=R0904
         }
         result = self.vera_request(**payload)
         logger.debug("set_service_value: "
-                  "result of vera_request with payload %s: %s",
-                  payload, result.text)
+                     "result of vera_request with payload %s: %s",
+                     payload, result.text)
 
     def call_service(self, service_id, action):
         """Call a Vera service.
@@ -507,8 +507,8 @@ class VeraDevice(object):  # pylint: disable=R0904
         result = self.vera_request(id='action', serviceId=service_id,
                                    action=action)
         logger.debug("call_service: "
-                  "result of vera_request with id %s: %s", service_id,
-                  result.text)
+                     "result of vera_request with id %s: %s", service_id,
+                     result.text)
         return result
 
     def set_cache_value(self, name, value):
@@ -521,7 +521,7 @@ class VeraDevice(object):  # pylint: disable=R0904
         dev_info = self.json_state.get('deviceInfo')
         if dev_info.get(name.lower()) is None:
             logger.error("Could not set %s for %s (key does not exist).",
-                      name, self.name)
+                         name, self.name)
             logger.error("- dictionary %s", dev_info)
             return
         dev_info[name.lower()] = str(value)
@@ -1014,8 +1014,10 @@ class VeraLock(VeraDevice):
         # or the locking action took too long
         # then reset the target and time
         now = time.time()
-        if self.lock_target is not None and (self.lock_target[0] == self.get_value("locked") or now - self.lock_target[1] >= LOCK_TARGET_TIMEOUT_SEC):
-            logger.debug("Resetting lock target for {} ({}=={}, {} - {} >= {})".format(self.name, self.lock_target[0], self.get_value("locked"), now, self.lock_target[1], LOCK_TARGET_TIMEOUT_SEC))
+        if (self.lock_target is not None and
+            (self.lock_target[0] == self.get_value("locked") or now - self.lock_target[1] >= LOCK_TARGET_TIMEOUT_SEC)):
+            logger.debug("Resetting lock target for {} ({}=={}, {} - {} >= {})".format(
+                         self.name, self.lock_target[0], self.get_value("locked"), now, self.lock_target[1], LOCK_TARGET_TIMEOUT_SEC))
             self.lock_target = None
 
         locked = self.get_value("locked") == '1'
@@ -1043,7 +1045,7 @@ class VeraLock(VeraDevice):
             logger.error('Got unsupported user string {}: {}'.format(val, ex))
             return None
 
-        return ( userid, username )
+        return (userid, username)
 
     def get_pin_failed(self, refresh=False):
         """True when a bad PIN code was entered"""
@@ -1102,7 +1104,7 @@ class VeraLock(VeraDevice):
                     codes.append((slot, name, pin))
             except Exception as ex:
                 logger.error('Problem parsing pin code string {}: {}'.format(code, ex))
-        
+
         return codes
 
     @property
@@ -1304,8 +1306,8 @@ class VeraScene(object):
         }
         result = self.vera_request(**payload)
         logger.debug("activate: "
-                  "result of vera_request with payload %s: %s",
-                  payload, result.text)
+                     "result of vera_request with payload %s: %s",
+                     payload, result.text)
 
         self._active = True
 

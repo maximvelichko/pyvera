@@ -25,8 +25,10 @@ STATE_NOT_PRESENT = 999
 # Get the logger for use in this module
 logger = logging.getLogger(__name__)
 
+
 class PyveraError(Exception):
     pass
+
 
 class SubscriptionRegistry(object):
     """Class for subscribing to wemo events."""
@@ -52,7 +54,6 @@ class SubscriptionRegistry(object):
         self._devices[device.vera_device_id].append(device)
         self._callbacks[device].append(callback)
 
-
     def unregister(self, device, callback):
         """Remove a registered change callback.
 
@@ -67,29 +68,43 @@ class SubscriptionRegistry(object):
         self._callbacks[device].remove(callback)
         self._devices[device.vera_device_id].remove(device)
 
-
     def _event(self, device_data_list, device_alert_list):
         # Guard against invalid data from Vera API
         if not isinstance(device_data_list, list):
+            logger.debug('Got invalid device_data_list: {}'.format(device_data_list))
             device_data_list = []
+
         if not isinstance(device_alert_list, list):
+            logger.debug('Got invalid device_alert_list: {}'.format(device_alert_list))
             device_alert_list = []
 
         # Find unique device_ids that have data across both device_data and alert_data
         device_ids = set()
-        [device_ids.add(int(device_data['id'])) for device_data in device_data_list]
-        [device_ids.add(int(alert_data['PK_Device'])) for alert_data in device_alert_list]
+
+        for device_data in device_data_list:
+            if 'id' in device_data:
+                device_ids.add(device_data['id'])
+            else:
+                logger.debug('Got invalid device_data: {}'.format(device_data))
+
+        for alert_data in device_alert_list:
+            if 'PK_Device' in alert_data:
+                device_ids.add(alert_data['PK_Device'])
+            else:
+                logger.debug('Got invalid alert_data: {}'.format(alert_data))
 
         for device_id in device_ids:
-            device_list = self._devices.get(device_id, ())
-            device_datas = [data for data in device_data_list if int(data['id']) == device_id]
-            device_alerts = [alert for alert in device_alert_list if int(alert['PK_Device']) == device_id]
+            try:
+                device_list = self._devices.get(device_id, ())
+                device_datas = [data for data in device_data_list if data.get('id') == device_id]
+                device_alerts = [alert for alert in device_alert_list if alert.get('PK_Device') == device_id]
 
-            device_data = device_datas[0] if device_datas else {}
+                device_data = device_datas[0] if device_datas else {}
 
-            for device in device_list:
-                self._event_device(device, device_data, device_alerts)
-
+                for device in device_list:
+                    self._event_device(device, device_data, device_alerts)
+            except Exception as e:
+                logger.exception('Error processing event for device_id {}: {}'.format(device_id, e))
 
     def _event_device(self, device, device_data, device_alerts):
         if device is None:
@@ -100,10 +115,7 @@ class SubscriptionRegistry(object):
         comment = device_data.get('comment', '')
         sending = comment.find('Sending') >= 0
         logger.debug("Event: %s, state %s, alerts %s, %s",
-                  device.name,
-                  state,
-                  len(device_alerts),
-                  json.dumps(device_data))
+                     device.name, state, len(device_alerts), json.dumps(device_data))
         device.set_alerts(device_alerts)
         if sending and state == STATE_NO_JOB:
             state = STATE_JOB_WAITING_TO_START
@@ -134,15 +146,13 @@ class SubscriptionRegistry(object):
                 (state == STATE_JOB_ERROR and
                     comment.find('Setting user configuration'))):
             logger.error("Device %s, state %s, %s",
-                      device.name,
-                      state,
-                      comment)
+                         device.name, state, comment)
             return
         device.update(device_data)
         for callback in self._callbacks.get(device, ()):
             try:
                 callback(device)
-            except:
+            except Exception:
                 # (Very) broad check to not let loosely-implemented callbacks
                 # kill our polling thread. They should be catching their own
                 # errors, so if it gets back to us, just log it and move on.
@@ -192,8 +202,7 @@ class SubscriptionRegistry(object):
                 logger.debug("Non-fatal error in poll: %s", str(ex))
                 pass
             except Exception as ex:
-                logger.exception("Vera poll thread general exception: %s",
-                    str(ex))
+                logger.exception("Vera poll thread general exception: %s", str(ex))
                 raise
             else:
                 logger.debug("Poll returned")
@@ -209,7 +218,7 @@ class SubscriptionRegistry(object):
             # After error, discard timestamp for fresh update. pyvera issue #89
             timestamp = {'dataversion': 1, 'loadtime': 0}
             logger.info("Could not poll Vera - will retry in %ss",
-                     SUBSCRIPTION_RETRY)
+                        SUBSCRIPTION_RETRY)
             time.sleep(SUBSCRIPTION_RETRY)
 
         logger.info("Shutdown Vera Poll Thread")
