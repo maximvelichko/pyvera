@@ -95,7 +95,7 @@ class SubscriptionRegistry(object):
 
         for device_id in device_ids:
             try:
-                device_list = self._devices.get(device_id, ())
+                device_list = self._devices.get(int(device_id), ())
                 device_datas = [data for data in device_data_list if data.get('id') == device_id]
                 device_alerts = [alert for alert in device_alert_list if alert.get('PK_Device') == device_id]
 
