@@ -33,12 +33,13 @@ class PyveraError(Exception):
 class SubscriptionRegistry(object):
     """Class for subscribing to wemo events."""
 
-    def __init__(self):
+    def __init__(self, controller=None):
         """Setup subscription."""
         self._devices = collections.defaultdict(list)
         self._callbacks = collections.defaultdict(list)
         self._exiting = False
         self._poll_thread = None
+        self._controller = controller
 
     def register(self, device, callback):
         """Register a callback.
@@ -179,7 +180,7 @@ class SubscriptionRegistry(object):
 
     def _run_poll_server(self):
         from pyvera import get_controller
-        controller = get_controller()
+        controller = self._controller or get_controller()
         timestamp = {'dataversion': 1, 'loadtime': 0}
         device_data = []
         alert_data = []

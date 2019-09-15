@@ -28,7 +28,7 @@ class TestVeraLock(unittest.TestCase):
                 '  }'
                 '}'
                 )
-        lock = pyvera.VeraLock(status_json, mock_controller)
+        lock = pyvera.VeraLock(status_json, [], mock_controller)
         lock.set_lock_state(1)
         self.assertTrue(lock.get_value('locked'), '1')
 
