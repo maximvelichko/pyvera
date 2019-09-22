@@ -8,6 +8,7 @@ setup(name='pyvera',
       author_email='mail@gregdowling.com',
       license='MIT',
       install_requires=['requests>=2.0'],
+      tests_require=['mock'],
       packages=find_packages(),
       test_suite="tests",
       zip_safe=True)

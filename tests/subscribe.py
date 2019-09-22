@@ -26,7 +26,7 @@ class TestSubscriptionRegistry(unittest.TestCase):
                 '  "state": "1"'
                 '}'
                 )
-        sr._event_device(mock_lock, device_json)
+        sr._event_device(mock_lock, device_json, [])
         mock_lock.update.assert_not_called()
 
         # Deadbolt progress with reset state but not done
@@ -37,7 +37,7 @@ class TestSubscriptionRegistry(unittest.TestCase):
                 '  "comment": "MyTestDeadbolt: Sending the Z-Wave command after 0 retries"'
                 '}'
                 )
-        sr._event_device(mock_lock, device_json)
+        sr._event_device(mock_lock, device_json, [])
         mock_lock.update.assert_not_called()
 
         # Deadbolt progress locked but not done
@@ -49,7 +49,7 @@ class TestSubscriptionRegistry(unittest.TestCase):
                 '  "comment": "MyTestDeadbolt"'
                 '}'
                 )
-        sr._event_device(mock_lock, device_json)
+        sr._event_device(mock_lock, device_json, [])
         mock_lock.update.assert_not_called()
 
         # Deadbolt progress with status but not done
@@ -60,7 +60,7 @@ class TestSubscriptionRegistry(unittest.TestCase):
                 '  "comment": "MyTestDeadbolt: Please wait! Polling node"'
                 '}'
                 )
-        sr._event_device(mock_lock, device_json)
+        sr._event_device(mock_lock, device_json, [])
         mock_lock.update.assert_not_called()
 
         # Deadbolt progress complete
@@ -76,7 +76,7 @@ class TestSubscriptionRegistry(unittest.TestCase):
                 '  }'
                 '}'
                 )
-        sr._event_device(mock_lock, device_json)
+        sr._event_device(mock_lock, device_json, [])
         mock_lock.update.assert_called_once_with(device_json)
 
 if __name__ == '__main__':

@@ -96,7 +96,7 @@ class VeraController(object):
         self.model = None
         self.serial_number = None
         self.device_services_map = None
-        self.subscription_registry = SubscriptionRegistry()
+        self.subscription_registry = SubscriptionRegistry(self)
         self.categories = {}
         self.device_id_map = {}
 
