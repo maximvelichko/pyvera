@@ -7,6 +7,7 @@ import logging
 import requests
 import sys
 import os
+import shlex
 import time
 from datetime import datetime
 
@@ -1036,11 +1037,11 @@ class VeraLock(VeraDevice):
 
         try:
             # Get the UserID="" and UserName="" fields separately
-            raw_userid, raw_username = val.split(' ')
-            # Get the right hand value without quotes of UserID="<here>"
-            userid = raw_userid.split('=')[1].split('"')[1]
-            # Get the right hand value without quotes of UserName="<here>"
-            username = raw_username.split('=')[1].split('"')[1]
+            raw_userid, raw_username = shlex.split(val)
+            # Get the right hand value of UserID=<here>
+            userid = raw_userid.split('=')[1]
+            # Get the right hand value of UserName=<here>
+            username = raw_username.split('=')[1]
         except Exception as ex:
             logger.error('Got unsupported user string {}: {}'.format(val, ex))
             return None
