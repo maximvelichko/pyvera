@@ -84,6 +84,8 @@ class VeraController(object):
     # pylint: disable=too-many-instance-attributes
     temperature_units = 'C'
 
+    TIMESTAMP_NONE = {'dataversion': 1, 'loadtime': 0}
+
     def __init__(self, base_url):
         """Setup Vera controller at the given URL.
 
@@ -291,7 +293,11 @@ class VeraController(object):
     def get_changed_devices(self, timestamp):
         """Get data since last timestamp.
 
-        This is done via a blocking call, pass NONE for initial state.
+        This function blocks until a change is returned by the Vera, or the
+        request times out.
+
+        timestamp param: the timestamp returned by the last invocation of this
+        function.  Use a timestamp of TIMESTAMP_NONE for the first invocation.
         """
         payload = {
             'timeout': SUBSCRIPTION_WAIT,
@@ -335,7 +341,14 @@ class VeraController(object):
         return [device_data, timestamp]
 
     def get_alerts(self, timestamp):
-        """Get alerts that have triggered since last timestamp"""
+        """Get alerts that have triggered since last timestamp.
+
+        Note that unlike get_changed_devices, this is non-blocking.
+
+        timestamp param: the timestamp returned by the prior (not current)
+        invocation of get_changed_devices.  Use a timestamp of TIMESTAMP_NONE
+        for the first invocation.
+        """
 
         payload = {
             'LoadTime': timestamp['loadtime'],
