@@ -182,7 +182,9 @@ class VeraController(object):
     def get_devices(self, category_filter=''):
         """Get list of connected devices.
 
-        category_filter param is an array of strings
+        category_filter param is an array of strings.  If specified, this
+        function will only return devices with category names which match the
+        strings in this filter.
         """
         # pylint: disable=too-many-branches
 
@@ -250,7 +252,12 @@ class VeraController(object):
         return devices
 
     def refresh_data(self):
-        """Refresh data from Vera device."""
+        """Refresh mapping from device ids to devices."""
+        # Note: This function is side-effect free and appears to be unused.
+        # Safe to erase?
+
+        # the Vera rest API is a bit rough so we need to make 2 calls
+        # to get all the info e need
         j = self.data_request({'id': 'sdata'}).json()
 
         self.temperature_units = j.get('temperature', 'C')
@@ -275,8 +282,8 @@ class VeraController(object):
 
     def map_services(self):
         """Get full Vera device service info."""
-        # the Vera rest API is a bit rough so we need to make 2 calls
-        # to get all the info e need
+        # Note: This function updates the device_services_map, but that map does
+        # not appear to be used.  Safe to erase?
         self.get_simple_devices_info()
 
         j = self.data_request({'id': 'status', 'output_format': 'json'}).json()
@@ -341,7 +348,7 @@ class VeraController(object):
         return [device_data, timestamp]
 
     def get_alerts(self, timestamp):
-        """Get alerts that have triggered since last timestamp
+        """Get alerts that have triggered since last timestamp.
 
         Note that unlike get_changed_devices, this is non-blocking.
 
@@ -375,6 +382,23 @@ class VeraController(object):
 
         return result.get('alerts', [])
 
+    # The subscription thread (if you use it) runs in the background and blocks
+    # waiting for state changes (a.k.a. events) from the Vera controller.  When
+    # an event occurs, the subscription thread will invoke any callbacks for
+    # affected devices.
+    #
+    # The subscription thread is (obviously) run on a separate thread.  This
+    # means there is a potential for race conditions.  Pyvera contains no locks
+    # or synchronization primitives.  To avoid race conditions, clients should
+    # do the following:
+    #
+    # (a) set up Pyvera, including registering any callbacks, before starting
+    # the subscription thread.
+    #
+    # (b) Once the subscription thread has started, realize that callbacks will
+    # be invoked in the context of the subscription thread.  Only access Pyvera
+    # from those callbacks from that point forwards.
+
     def start(self):
         """Start the subscription thread."""
         self.subscription_registry.start()
@@ -384,7 +408,11 @@ class VeraController(object):
         self.subscription_registry.stop()
 
     def register(self, device, callback):
-        """Register a device and callback with the subscription service."""
+        """Register a device and callback with the subscription service.  
+
+        The callback will be called from the subscription thread when the device
+        is updated.
+        """
         self.subscription_registry.register(device, callback)
 
     def unregister(self, device, callback):
@@ -1092,8 +1120,26 @@ class VeraLock(VeraDevice):
                 return 1
         return 0
 
+    # The following three functions are less useful than you might think.  Once
+    # a user enters a bad PIN code, get_pin_failed() appears to remain True
+    # forever (or at least, until you reboot the Vera?).  Similarly,
+    # get_unauth_user(), and get_lock_failed() don't appear to reset.
+    # get_last_user() also has this property -- but get_last_user_alert() is
+    # more useful.
+    #
+    # We could implement this as a destructive read -- unset the variables on
+    # the Vera after we read them.  But this assumes the Vera only has a single
+    # client using this API (otherwise the two clients would interfere with each
+    # other).  Also, this technique has an unavoidable race condition -- what if
+    # the Vera updates the variable after we've read it but before we clear it?
+    #
+    # The fundamental problem is with the HTTP API to the Vera.  On the Vera
+    # itself you can observe when a variable is written (or overwritten, even
+    # with an identical value) by using the Lua function luup.variable_watch().
+    # No equivalent appears to exist in the HTTP API.
+
     def get_pin_failed(self, refresh=False):
-        """True when a bad PIN code was entered"""
+        """True when a bad PIN code was entered."""
         if refresh:
             self.refresh_complex_value('sl_PinFailed')
         return self.get_complex_value("sl_PinFailed") == '1'
