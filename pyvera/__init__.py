@@ -341,7 +341,7 @@ class VeraController(object):
         return [device_data, timestamp]
 
     def get_alerts(self, timestamp):
-        """Get alerts that have triggered since last timestamp.
+        """Get alerts that have triggered since last timestamp
 
         Note that unlike get_changed_devices, this is non-blocking.
 
@@ -1040,17 +1040,13 @@ class VeraLock(VeraDevice):
             logger.debug("Lock still in progress for {}: target={}".format(self.name, locked))
         return locked
 
-    def get_last_user(self, refresh=False):
-        """Get the last used PIN user id"""
-        if refresh:
-            self.refresh_complex_value('sl_UserCode')
-        val = self.get_complex_value("sl_UserCode")
+    def _parse_usercode(self, user_code):
         # Syntax string: UserID="<pin_slot>" UserName="<pin_code_name>"
         # See http://wiki.micasaverde.com/index.php/Luup_UPnP_Variables_and_Actions#DoorLock1
 
         try:
             # Get the UserID="" and UserName="" fields separately
-            raw_userid, raw_username = shlex.split(val)
+            raw_userid, raw_username = shlex.split(user_code)
             # Get the right hand value of UserID=<here>
             userid = raw_userid.split('=')[1]
             # Get the right hand value of UserName=<here>
@@ -1058,8 +1054,43 @@ class VeraLock(VeraDevice):
         except Exception as ex:
             logger.error('Got unsupported user string {}: {}'.format(val, ex))
             return None
-
         return (userid, username)
+
+    def get_last_user(self, refresh=False):
+        """Get the last used PIN user id.
+
+        This is sadly not as useful as it could be.  It will tell you the last
+        PIN used -- but if the lock is unlocked, you have no idea if a PIN was
+        used or just someone used a key or the knob.  So it is not possible to
+        use this API to determine *when* a PIN was used.
+        """
+        if refresh:
+            self.refresh_complex_value('sl_UserCode')
+        val = self.get_complex_value("sl_UserCode")
+
+        user = self._parse_usercode(val)
+        return user
+
+    def get_last_user_alert(self):
+        """Get the PIN used for the action in the last poll cycle.
+
+        Unlike get_last_user(), this function only returns a result when the
+        last action taken (such as an unlock) used a PIN.  So this is useful for
+        triggering events when a paritcular PIN is used.  Since it relies on the
+        poll cycle, this function is a no-op if subscriptions are not used.
+        """
+        for alert in self.alerts:
+            if alert.code == "DL_USERCODE":
+                user = self._parse_usercode(alert.value)
+                return user
+        return None
+
+    def get_low_battery_alert(self):
+        """See if a low battery alert was issued in the last poll cycle."""
+        for alert in self.alerts:
+            if alert.code == "DL_LOW_BATTERY":
+                return 1
+        return 0
 
     def get_pin_failed(self, refresh=False):
         """True when a bad PIN code was entered"""
