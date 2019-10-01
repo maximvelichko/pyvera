@@ -180,8 +180,9 @@ class SubscriptionRegistry(object):
 
     def _run_poll_server(self):
         from pyvera import get_controller
+        from pyvera import VeraController
         controller = self._controller or get_controller()
-        timestamp = {'dataversion': 1, 'loadtime': 0}
+        timestamp = VeraController.TIMESTAMP_NONE
         device_data = []
         alert_data = []
         data_changed = False

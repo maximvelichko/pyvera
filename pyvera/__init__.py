@@ -84,6 +84,8 @@ class VeraController(object):
     # pylint: disable=too-many-instance-attributes
     temperature_units = 'C'
 
+    TIMESTAMP_NONE = {'dataversion': 1, 'loadtime': 0}
+
     def __init__(self, base_url):
         """Setup Vera controller at the given URL.
 
@@ -180,7 +182,9 @@ class VeraController(object):
     def get_devices(self, category_filter=''):
         """Get list of connected devices.
 
-        category_filter param is an array of strings
+        category_filter param is an array of strings.  If specified, this
+        function will only return devices with category names which match the
+        strings in this filter.
         """
         # pylint: disable=too-many-branches
 
@@ -248,7 +252,12 @@ class VeraController(object):
         return devices
 
     def refresh_data(self):
-        """Refresh data from Vera device."""
+        """Refresh mapping from device ids to devices."""
+        # Note: This function is side-effect free and appears to be unused.
+        # Safe to erase?
+
+        # the Vera rest API is a bit rough so we need to make 2 calls
+        # to get all the info e need
         j = self.data_request({'id': 'sdata'}).json()
 
         self.temperature_units = j.get('temperature', 'C')
@@ -273,8 +282,8 @@ class VeraController(object):
 
     def map_services(self):
         """Get full Vera device service info."""
-        # the Vera rest API is a bit rough so we need to make 2 calls
-        # to get all the info e need
+        # Note: This function updates the device_services_map, but that map does
+        # not appear to be used.  Safe to erase?
         self.get_simple_devices_info()
 
         j = self.data_request({'id': 'status', 'output_format': 'json'}).json()
@@ -291,7 +300,11 @@ class VeraController(object):
     def get_changed_devices(self, timestamp):
         """Get data since last timestamp.
 
-        This is done via a blocking call, pass NONE for initial state.
+        This function blocks until a change is returned by the Vera, or the
+        request times out.
+
+        timestamp param: the timestamp returned by the last invocation of this
+        function.  Use a timestamp of TIMESTAMP_NONE for the first invocation.
         """
         payload = {
             'timeout': SUBSCRIPTION_WAIT,
@@ -335,7 +348,14 @@ class VeraController(object):
         return [device_data, timestamp]
 
     def get_alerts(self, timestamp):
-        """Get alerts that have triggered since last timestamp"""
+        """Get alerts that have triggered since last timestamp.
+
+        Note that unlike get_changed_devices, this is non-blocking.
+
+        timestamp param: the timestamp returned by the prior (not current)
+        invocation of get_changed_devices.  Use a timestamp of TIMESTAMP_NONE
+        for the first invocation.
+        """
 
         payload = {
             'LoadTime': timestamp['loadtime'],
@@ -362,6 +382,23 @@ class VeraController(object):
 
         return result.get('alerts', [])
 
+    # The subscription thread (if you use it) runs in the background and blocks
+    # waiting for state changes (a.k.a. events) from the Vera controller.  When
+    # an event occurs, the subscription thread will invoke any callbacks for
+    # affected devices.
+    #
+    # The subscription thread is (obviously) run on a separate thread.  This
+    # means there is a potential for race conditions.  Pyvera contains no locks
+    # or synchronization primitives.  To avoid race conditions, clients should
+    # do the following:
+    #
+    # (a) set up Pyvera, including registering any callbacks, before starting
+    # the subscription thread.
+    #
+    # (b) Once the subscription thread has started, realize that callbacks will
+    # be invoked in the context of the subscription thread.  Only access Pyvera
+    # from those callbacks from that point forwards.
+
     def start(self):
         """Start the subscription thread."""
         self.subscription_registry.start()
@@ -371,7 +408,11 @@ class VeraController(object):
         self.subscription_registry.stop()
 
     def register(self, device, callback):
-        """Register a device and callback with the subscription service."""
+        """Register a device and callback with the subscription service.  
+
+        The callback will be called from the subscription thread when the device
+        is updated.
+        """
         self.subscription_registry.register(device, callback)
 
     def unregister(self, device, callback):
@@ -1027,17 +1068,13 @@ class VeraLock(VeraDevice):
             logger.debug("Lock still in progress for {}: target={}".format(self.name, locked))
         return locked
 
-    def get_last_user(self, refresh=False):
-        """Get the last used PIN user id"""
-        if refresh:
-            self.refresh_complex_value('sl_UserCode')
-        val = self.get_complex_value("sl_UserCode")
+    def _parse_usercode(self, user_code):
         # Syntax string: UserID="<pin_slot>" UserName="<pin_code_name>"
         # See http://wiki.micasaverde.com/index.php/Luup_UPnP_Variables_and_Actions#DoorLock1
 
         try:
             # Get the UserID="" and UserName="" fields separately
-            raw_userid, raw_username = shlex.split(val)
+            raw_userid, raw_username = shlex.split(user_code)
             # Get the right hand value of UserID=<here>
             userid = raw_userid.split('=')[1]
             # Get the right hand value of UserName=<here>
@@ -1045,11 +1082,64 @@ class VeraLock(VeraDevice):
         except Exception as ex:
             logger.error('Got unsupported user string {}: {}'.format(val, ex))
             return None
-
         return (userid, username)
 
+    def get_last_user(self, refresh=False):
+        """Get the last used PIN user id.
+
+        This is sadly not as useful as it could be.  It will tell you the last
+        PIN used -- but if the lock is unlocked, you have no idea if a PIN was
+        used or just someone used a key or the knob.  So it is not possible to
+        use this API to determine *when* a PIN was used.
+        """
+        if refresh:
+            self.refresh_complex_value('sl_UserCode')
+        val = self.get_complex_value("sl_UserCode")
+
+        user = self._parse_usercode(val)
+        return user
+
+    def get_last_user_alert(self):
+        """Get the PIN used for the action in the last poll cycle.
+
+        Unlike get_last_user(), this function only returns a result when the
+        last action taken (such as an unlock) used a PIN.  So this is useful for
+        triggering events when a paritcular PIN is used.  Since it relies on the
+        poll cycle, this function is a no-op if subscriptions are not used.
+        """
+        for alert in self.alerts:
+            if alert.code == "DL_USERCODE":
+                user = self._parse_usercode(alert.value)
+                return user
+        return None
+
+    def get_low_battery_alert(self):
+        """See if a low battery alert was issued in the last poll cycle."""
+        for alert in self.alerts:
+            if alert.code == "DL_LOW_BATTERY":
+                return 1
+        return 0
+
+    # The following three functions are less useful than you might think.  Once
+    # a user enters a bad PIN code, get_pin_failed() appears to remain True
+    # forever (or at least, until you reboot the Vera?).  Similarly,
+    # get_unauth_user(), and get_lock_failed() don't appear to reset.
+    # get_last_user() also has this property -- but get_last_user_alert() is
+    # more useful.
+    #
+    # We could implement this as a destructive read -- unset the variables on
+    # the Vera after we read them.  But this assumes the Vera only has a single
+    # client using this API (otherwise the two clients would interfere with each
+    # other).  Also, this technique has an unavoidable race condition -- what if
+    # the Vera updates the variable after we've read it but before we clear it?
+    #
+    # The fundamental problem is with the HTTP API to the Vera.  On the Vera
+    # itself you can observe when a variable is written (or overwritten, even
+    # with an identical value) by using the Lua function luup.variable_watch().
+    # No equivalent appears to exist in the HTTP API.
+
     def get_pin_failed(self, refresh=False):
-        """True when a bad PIN code was entered"""
+        """True when a bad PIN code was entered."""
         if refresh:
             self.refresh_complex_value('sl_PinFailed')
         return self.get_complex_value("sl_PinFailed") == '1'
