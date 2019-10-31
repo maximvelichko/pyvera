@@ -7,7 +7,7 @@ import threading
 import requests
 
 # How long to wait before retrying Vera
-SUBSCRIPTION_RETRY = 10
+SUBSCRIPTION_RETRY = 9
 
 # Vera state codes see http://wiki.micasaverde.com/index.php/Luup_Requests
 STATE_NO_JOB = -1
@@ -187,7 +187,7 @@ class SubscriptionRegistry(object):
         device_data = []
         alert_data = []
         data_changed = False
-        while not self._exiting.wait(timeout=SUBSCRIPTION_RETRY):
+        while not self._exiting.wait(timeout=1):
             try:
                 logger.debug("Polling for Vera changes")
                 device_data, new_timestamp = (
@@ -221,5 +221,7 @@ class SubscriptionRegistry(object):
             timestamp = {'dataversion': 1, 'loadtime': 0}
             logger.info("Could not poll Vera - will retry in %ss",
                         SUBSCRIPTION_RETRY)
+
+            self._exiting.wait(timeout=SUBSCRIPTION_RETRY)
 
         logger.info("Shutdown Vera Poll Thread")
