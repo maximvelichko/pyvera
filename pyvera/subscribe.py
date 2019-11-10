@@ -37,7 +37,7 @@ class SubscriptionRegistry(object):
         """Setup subscription."""
         self._devices = collections.defaultdict(list)
         self._callbacks = collections.defaultdict(list)
-        self._exiting = False
+        self._exiting = None
         self._poll_thread = None
         self._controller = controller
 
@@ -175,7 +175,7 @@ class SubscriptionRegistry(object):
 
     def stop(self):
         """Tell the subscription thread to terminate."""
-        self._exiting.set()
+        self._exiting and self._exiting.set()
         self.join()
         logger.info("Terminated thread")
 
