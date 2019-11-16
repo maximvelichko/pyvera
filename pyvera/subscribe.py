@@ -7,7 +7,7 @@ import threading
 import requests
 
 # How long to wait before retrying Vera
-SUBSCRIPTION_RETRY = 10
+SUBSCRIPTION_RETRY = 9
 
 # Vera state codes see http://wiki.micasaverde.com/index.php/Luup_Requests
 STATE_NO_JOB = -1
@@ -37,7 +37,7 @@ class SubscriptionRegistry(object):
         """Setup subscription."""
         self._devices = collections.defaultdict(list)
         self._callbacks = collections.defaultdict(list)
-        self._exiting = False
+        self._exiting = None
         self._poll_thread = None
         self._controller = controller
 
@@ -169,12 +169,13 @@ class SubscriptionRegistry(object):
         """Start a thread to handle Vera blocked polling."""
         self._poll_thread = threading.Thread(target=self._run_poll_server,
                                              name='Vera Poll Thread')
+        self._exiting = threading.Event()
         self._poll_thread.deamon = True
         self._poll_thread.start()
 
     def stop(self):
         """Tell the subscription thread to terminate."""
-        self._exiting = True
+        self._exiting and self._exiting.set()
         self.join()
         logger.info("Terminated thread")
 
@@ -186,7 +187,7 @@ class SubscriptionRegistry(object):
         device_data = []
         alert_data = []
         data_changed = False
-        while not self._exiting:
+        while not self._exiting.wait(timeout=1):
             try:
                 logger.debug("Polling for Vera changes")
                 device_data, new_timestamp = (
@@ -208,12 +209,11 @@ class SubscriptionRegistry(object):
                 raise
             else:
                 logger.debug("Poll returned")
-                if not self._exiting:
+                if not self._exiting.is_set():
                     if data_changed:
                         self._event(device_data, alert_data)
                     else:
                         logger.debug("No changes in poll interval")
-                    time.sleep(1)
 
                 continue
 
@@ -221,6 +221,7 @@ class SubscriptionRegistry(object):
             timestamp = {'dataversion': 1, 'loadtime': 0}
             logger.info("Could not poll Vera - will retry in %ss",
                         SUBSCRIPTION_RETRY)
-            time.sleep(SUBSCRIPTION_RETRY)
+
+            self._exiting.wait(timeout=SUBSCRIPTION_RETRY)
 
         logger.info("Shutdown Vera Poll Thread")
