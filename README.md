@@ -67,6 +67,20 @@ logger:
         pyvera: debug
 ~~~~
 
+Developing
+-------
+~~~~
+# Setup the environment.
+python3 -m venv venv
+source venv/bin/activate
+python setup.py install
+
+# Make code changes.
+
+# Test the changes.
+pytest
+~~~~
+
 License
 -------
 The initial code was initially was written by James Cole and released under the BSD license. The rest is released under the MIT license.

@@ -32,6 +32,7 @@ CATEGORY_THERMOSTAT = 5
 CATEGORY_LOCK = 7
 CATEGORY_CURTAIN = 8
 CATEGORY_REMOTE = 9
+CATEGORY_GENERIC = 11
 CATEGORY_SENSOR = 12
 CATEGORY_SCENE_CONTROLLER = 14
 CATEGORY_HUMIDITY_SENSOR = 16
@@ -235,7 +236,8 @@ class VeraController(object):
                     device_category == CATEGORY_SWITCH or
                     device_category == CATEGORY_VERA_SIREN or
                     device_category == CATEGORY_CURTAIN or
-                    device_category == CATEGORY_GARAGE_DOOR)):
+                    device_category == CATEGORY_GARAGE_DOOR
+                )):
                     self.devices.append(VeraArmableDevice(item, item_alerts, self))
             else:
                 self.devices.append(VeraDevice(item, item_alerts, self))
@@ -408,7 +410,7 @@ class VeraController(object):
         self.subscription_registry.stop()
 
     def register(self, device, callback):
-        """Register a device and callback with the subscription service.  
+        """Register a device and callback with the subscription service.
 
         The callback will be called from the subscription thread when the device
         is updated.
@@ -1056,8 +1058,10 @@ class VeraLock(VeraDevice):
         # or the locking action took too long
         # then reset the target and time
         now = time.time()
-        if (self.lock_target is not None and
-            (self.lock_target[0] == self.get_value("locked") or now - self.lock_target[1] >= LOCK_TARGET_TIMEOUT_SEC)):
+        if (self.lock_target is not None and (
+                self.lock_target[0] == self.get_value("locked")
+                or now - self.lock_target[1] >= LOCK_TARGET_TIMEOUT_SEC
+        )):
             logger.debug("Resetting lock target for {} ({}=={}, {} - {} >= {})".format(
                          self.name, self.lock_target[0], self.get_value("locked"), now, self.lock_target[1], LOCK_TARGET_TIMEOUT_SEC))
             self.lock_target = None
@@ -1080,7 +1084,10 @@ class VeraLock(VeraDevice):
             # Get the right hand value of UserName=<here>
             username = raw_username.split('=')[1]
         except Exception as ex:
-            logger.error('Got unsupported user string {}: {}'.format(val, ex))
+            logger.error('Got unsupported user string {}: {}'.format(
+                user_code,
+                ex
+            ))
             return None
         return (userid, username)
 
