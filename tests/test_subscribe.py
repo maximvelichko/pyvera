@@ -1,7 +1,7 @@
 import json
 import logging
 
-import mock
+import unittest.mock as mock
 import pyvera
 
 logging.basicConfig(level=logging.DEBUG)
