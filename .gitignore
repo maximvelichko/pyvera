@@ -3,3 +3,8 @@ build
 dist
 pyvera.egg-info
 *.pyc
+.coverage
+.eggs
+.idea
+venv
+.pytest_cache
