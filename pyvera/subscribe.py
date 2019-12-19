@@ -6,6 +6,8 @@ import threading
 
 import requests
 
+from .const import TIMESTAMP_NONE
+
 # How long to wait before retrying Vera
 SUBSCRIPTION_RETRY = 9
 
@@ -199,11 +201,8 @@ class SubscriptionRegistry:
         LOG.info("Terminated thread")
 
     def _run_poll_server(self):
-        # pylint: disable=import-outside-toplevel
-        from pyvera import get_controller, VeraController
-
-        controller = self._controller or get_controller()
-        timestamp = VeraController.TIMESTAMP_NONE
+        controller = self._controller
+        timestamp = TIMESTAMP_NONE
         device_data = []
         alert_data = []
         data_changed = False

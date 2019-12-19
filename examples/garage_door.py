@@ -8,7 +8,7 @@ import os
 import sys
 
 # Import pyvera
-import pyvera
+from pyvera import VeraController, VeraGarageDoor
 
 
 def main():
@@ -23,7 +23,8 @@ def main():
     args = parser.parse_args()
 
     # Start the controller
-    controller, _ = pyvera.init_controller(args.url)
+    controller = VeraController(args.url)
+    controller.start()
 
     try:
         # Get a list of all the devices on the vera controller
@@ -31,7 +32,7 @@ def main():
 
         # Open/close all garage doors.
         for device in all_devices:
-            if isinstance(device, pyvera.VeraGarageDoor):
+            if isinstance(device, VeraGarageDoor):
                 if args.close:
                     device.switch_off()
                 else:

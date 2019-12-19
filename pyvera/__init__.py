@@ -12,6 +12,7 @@ import time
 
 import requests
 
+from .common import init_logging
 from .subscribe import PyveraError, SubscriptionRegistry
 
 __author__ = "jamespcole"
@@ -43,21 +44,6 @@ CATEGORY_VERA_SIREN = 24
 CATEGORY_UV_SENSOR = 28
 CATEGORY_GARAGE_DOOR = 32
 
-_VERA_CONTROLLER = None
-
-
-def init_logging(logger, logger_level: str) -> None:
-    """Initialize the logger."""
-    # Set logging level (such as INFO, DEBUG, etc) via an environment variable
-    # Defaults to WARNING log level unless PYVERA_LOGLEVEL variable exists
-    if logger_level:
-        logger.setLevel(logger_level)
-        log_handler = logging.StreamHandler()
-        log_handler.setFormatter(
-            logging.Formatter("%(levelname)s@{%(name)s:%(lineno)d} - %(message)s")
-        )
-        logger.addHandler(log_handler)
-
 
 # Set up the console logger for debugging
 LOG = logging.getLogger(__name__)
@@ -65,34 +51,11 @@ init_logging(LOG, os.environ.get("PYVERA_LOGLEVEL", None))
 LOG.debug("DEBUG logging is ON")
 
 
-def init_controller(url):
-    """Initialize a controller.
-
-    Provides a single global controller for applications that can't do this
-    themselves
-    """
-    # pylint: disable=global-statement
-    global _VERA_CONTROLLER
-    created = False
-    if _VERA_CONTROLLER is None:
-        _VERA_CONTROLLER = VeraController(url)
-        created = True
-        _VERA_CONTROLLER.start()
-    return [_VERA_CONTROLLER, created]
-
-
-def get_controller():
-    """Return the global controller from init_controller."""
-    return _VERA_CONTROLLER
-
-
 # pylint: disable=too-many-instance-attributes
 class VeraController:
     """Class to interact with the Vera device."""
 
     temperature_units = "C"
-
-    TIMESTAMP_NONE = {"dataversion": 1, "loadtime": 0}
 
     def __init__(self, base_url):
         """Setup Vera controller at the given URL.

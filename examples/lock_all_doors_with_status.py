@@ -9,7 +9,7 @@ import sys
 import time
 
 # Import pyvera
-import pyvera
+from pyvera import VeraController, VeraLock
 
 
 # Define a callback that runs each time a device changes state
@@ -34,7 +34,8 @@ def main():
     args = parser.parse_args()
 
     # Start the controller
-    controller, _ = pyvera.init_controller(args.url)
+    controller = VeraController(args.url)
+    controller.start()
 
     try:
         # Get a list of all the devices on the vera controller
@@ -43,7 +44,7 @@ def main():
         # Look over the list and find the lock devices
         lock_devices = []
         for device in all_devices:
-            if isinstance(device, pyvera.VeraLock):
+            if isinstance(device, VeraLock):
                 # Register a callback that runs when the info for that device is updated
                 controller.register(device, device_info_callback)
                 print(
