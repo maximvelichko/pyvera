@@ -214,10 +214,7 @@ class VeraController:
 
             if device_category == CATEGORY_DIMMER:
                 device = VeraDimmer(item, item_alerts, self)
-            elif device_category in (
-                CATEGORY_SWITCH,
-                CATEGORY_VERA_SIREN,
-            ):
+            elif device_category in (CATEGORY_SWITCH, CATEGORY_VERA_SIREN):
                 device = VeraSwitch(item, item_alerts, self)
             elif device_category == CATEGORY_THERMOSTAT:
                 device = VeraThermostat(item, item_alerts, self)
@@ -236,10 +233,7 @@ class VeraController:
                 CATEGORY_UV_SENSOR,
             ):
                 device = VeraSensor(item, item_alerts, self)
-            elif device_category in (
-                CATEGORY_SCENE_CONTROLLER,
-                CATEGORY_REMOTE,
-            ):
+            elif device_category in (CATEGORY_SCENE_CONTROLLER, CATEGORY_REMOTE):
                 device = VeraSceneController(item, item_alerts, self)
             elif device_category == CATEGORY_GARAGE_DOOR:
                 device = VeraGarageDoor(item, item_alerts, self)
@@ -259,7 +253,8 @@ class VeraController:
         return [
             device
             for device in self.devices
-            if not category_filter or (
+            if not category_filter
+            or (
                 device.category_name is not None
                 and device.category_name != ""
                 and device.category_name in category_filter
@@ -350,7 +345,9 @@ class VeraController:
             raise PyveraError("JSON decode error: " + str(ex))
 
         if not (
-            isinstance(result, dict) and "loadtime" in result and "dataversion" in result
+            isinstance(result, dict)
+            and "loadtime" in result
+            and "dataversion" in result
         ):
             raise PyveraError("Unexpected/garbled response from Vera")
 
@@ -391,7 +388,9 @@ class VeraController:
             raise PyveraError("JSON decode error: " + str(ex))
 
         if not (
-            isinstance(result, dict) and "LoadTime" in result and "DataVersion" in result
+            isinstance(result, dict)
+            and "LoadTime" in result
+            and "DataVersion" in result
         ):
             raise PyveraError("Unexpected/garbled response from Vera")
 
@@ -572,9 +571,7 @@ class VeraDevice:
         """
         dev_info = self.json_state.get("deviceInfo")
         if dev_info.get(name.lower()) is None:
-            LOG.error(
-                "Could not set %s for %s (key does not exist).", name, self.name
-            )
+            LOG.error("Could not set %s for %s (key does not exist).", name, self.name)
             LOG.error("- dictionary %s", dev_info)
             return
         dev_info[name.lower()] = str(value)
@@ -1079,9 +1076,7 @@ class VeraLock(VeraDevice):
         locked = self.get_value("locked") == "1"
         if self.lock_target is not None:
             locked = self.lock_target[0] == "1"
-            LOG.debug(
-                "Lock still in progress for %s: target=%s", self.name, locked
-            )
+            LOG.debug("Lock still in progress for %s: target=%s", self.name, locked)
         return locked
 
     @staticmethod

@@ -30,7 +30,11 @@ def main():
 
         # Print the devices out
         for device in all_devices:
-            print("{} {} ({})".format(type(device).__name__, device.name, device.device_id))
+            print(
+                "{} {} ({})".format(
+                    type(device).__name__, device.name, device.device_id
+                )
+            )
 
     finally:
         # Stop the subscription listening thread so we can quit

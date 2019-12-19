@@ -38,8 +38,12 @@ def main():
     )
     group = parser.add_mutually_exclusive_group(required=True)
     # Pass in either the vera id of the device or the name
-    group.add_argument("-i", "--id", type=int, help="The Vera Device ID for subscription")
-    group.add_argument("-n", "--name", help="The Vera Device name string for subscription")
+    group.add_argument(
+        "-i", "--id", type=int, help="The Vera Device ID for subscription"
+    )
+    group.add_argument(
+        "-n", "--name", help="The Vera Device name string for subscription"
+    )
     args = parser.parse_args()
 
     # Start the controller
@@ -54,7 +58,9 @@ def main():
             found_device = controller.get_device_by_id(args.id)
 
         if found_device is None:
-            raise Exception("Did not find  device with {} or {}".format(args.name, args.id))
+            raise Exception(
+                "Did not find  device with {} or {}".format(args.name, args.id)
+            )
 
         print(
             "Listening for changes to {}: {}_{}".format(

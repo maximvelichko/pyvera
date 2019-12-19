@@ -32,7 +32,9 @@ def main():
         for device in all_devices:
             if isinstance(device, pyvera.VeraLock):
                 print(
-                    "{} {} ({})".format(type(device).__name__, device.name, device.device_id)
+                    "{} {} ({})".format(
+                        type(device).__name__, device.name, device.device_id
+                    )
                 )
                 print("    comm_failure: {}".format(device.comm_failure))
                 print("    room_id: {}".format(device.room_id))

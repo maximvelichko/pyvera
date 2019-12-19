@@ -152,7 +152,7 @@ class SubscriptionRegistry:
             STATE_JOB_IN_PROGRESS,
             STATE_JOB_WAITING_FOR_CALLBACK,
             STATE_JOB_REQUEUE,
-            STATE_JOB_PENDING_DATA
+            STATE_JOB_PENDING_DATA,
         ):
             return
         if not (

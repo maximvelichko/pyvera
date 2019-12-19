@@ -39,18 +39,18 @@ fi
 isort $ISORT_ARGS
 
 
-#echo
-#echo "===Formatting code==="
-#if [[ `which black` ]]; then
-#  BLACK_ARGS=""
-#  if [[ "${CI:-}" = "1" ]]; then
-#    BLACK_ARGS="--check"
-#  fi
-#
-#  black $BLACK_ARGS .
-#else
-#  echo "Warning: Skipping code formatting. You should use python >= 3.6."
-#fi
+echo
+echo "===Formatting code==="
+if [[ `which black` ]]; then
+  BLACK_ARGS=""
+  if [[ "${CI:-}" = "1" ]]; then
+    BLACK_ARGS="--check"
+  fi
+
+  black $BLACK_ARGS .
+else
+  echo "Warning: Skipping code formatting. You should use python >= 3.6."
+fi
 
 
 echo

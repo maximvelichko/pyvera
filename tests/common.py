@@ -97,10 +97,10 @@ def update_device(
     assert device_status, "Failed to find device status with device id %d" % device_id
 
     controller_data.api_data.lu_sdata.get("devices").append(device)
-    controller_data.api_data.lu_sdata["loadtime"] = 'now'
+    controller_data.api_data.lu_sdata["loadtime"] = "now"
     controller_data.api_data.lu_sdata["dataversion"] += 1
 
-    controller_data.api_data.status["LoadTime"] = 'now'
+    controller_data.api_data.status["LoadTime"] = "now"
     controller_data.api_data.status["DataVersion"] += 1
 
     device_status[key] = value
@@ -147,25 +147,48 @@ def handle_lu_action(payload: dict, api_data: VeraApiData) -> Tuple[int, dict, s
 
     if service_id == "urn:upnp-org:serviceId:SwitchPower1" and action == "SetTarget":
         status_variable_name = "status"
-    elif service_id == "urn:upnp-org:serviceId:Dimming1" and action == "SetLoadLevelTarget":
+    elif (
+        service_id == "urn:upnp-org:serviceId:Dimming1"
+        and action == "SetLoadLevelTarget"
+    ):
         status_variable_name = "level"
-    elif service_id == "urn:micasaverde-com:serviceId:SecuritySensor1" and action == "SetArmed":
+    elif (
+        service_id == "urn:micasaverde-com:serviceId:SecuritySensor1"
+        and action == "SetArmed"
+    ):
         status_variable_name = "armed"
-    elif service_id == "urn:upnp-org:serviceId:WindowCovering1" and action == "SetLoadLevelTarget":
+    elif (
+        service_id == "urn:upnp-org:serviceId:WindowCovering1"
+        and action == "SetLoadLevelTarget"
+    ):
         status_variable_name = "level"
-    elif service_id == "urn:micasaverde-com:serviceId:DoorLock1" and action == "NewTarget":
+    elif (
+        service_id == "urn:micasaverde-com:serviceId:DoorLock1"
+        and action == "NewTarget"
+    ):
         status_variable_name = "locked"
-    elif service_id == "urn:upnp-org:serviceId:HVAC_UserOperatingMode1" and action == "SetModeTarget":
+    elif (
+        service_id == "urn:upnp-org:serviceId:HVAC_UserOperatingMode1"
+        and action == "SetModeTarget"
+    ):
         status_variable_name = "mode"
-    elif service_id == "urn:upnp-org:serviceId:HVAC_FanOperatingMode1" and action == "SetMode":
+    elif (
+        service_id == "urn:upnp-org:serviceId:HVAC_FanOperatingMode1"
+        and action == "SetMode"
+    ):
         status_variable_name = "fanmode"
     elif service_id == "urn:upnp-org:serviceId:TemperatureSetpoint1_Cool":
         pass
     elif service_id == "urn:upnp-org:serviceId:TemperatureSetpoint1_Heat":
         pass
-    elif service_id == "urn:upnp-org:serviceId:TemperatureSetpoint1" and action == "SetCurrentSetpoint":
+    elif (
+        service_id == "urn:upnp-org:serviceId:TemperatureSetpoint1"
+        and action == "SetCurrentSetpoint"
+    ):
         status_variable_name = "setpoint"
-    elif service_id == "urn:micasaverde-com:serviceId:Color1" and action == "SetColorRGB":
+    elif (
+        service_id == "urn:micasaverde-com:serviceId:Color1" and action == "SetColorRGB"
+    ):
         status_variable_name = "CurrentColor"
 
     device = get_device(device_id, api_data)
@@ -208,7 +231,9 @@ def handle_variable_get(payload: dict, api_data: VeraApiData) -> Tuple[int, dict
     return 200, {}, ""
 
 
-def handle_request(req: requests.PreparedRequest, api_data: VeraApiData) -> Tuple[int, dict, str]:
+def handle_request(
+    req: requests.PreparedRequest, api_data: VeraApiData
+) -> Tuple[int, dict, str]:
     """Handle a request for data from the controller."""
     url_parts = urlparse(req.url)
     qs_parts = parse_qs(url_parts.query)
@@ -255,7 +280,7 @@ class VeraControllerFactory:
             method=responses.GET,
             url=re.compile(f"{base_url}/data_request?.*"),
             callback=callback,
-            content_type='application/json',
+            content_type="application/json",
         )
 
         controller = VeraController("http://127.0.0.1:123")
@@ -828,10 +853,6 @@ RESPONSE_STATUS = {
     ],
 }
 
-RESPONSE_LU_SDATA = {
-    "loadtime": None,
-    "dataversion": 1,
-    "devices": [],
-}
+RESPONSE_LU_SDATA = {"loadtime": None, "dataversion": 1, "devices": []}
 
 RESPONSE_SCENES = {}

@@ -69,14 +69,14 @@ def test_polling(vera_controller_data: VeraControllerData) -> None:
         device_id=DEVICE_TEMP_SENSOR_ID,
         key="temperature",
         value="66.00",
-        push=False
+        push=False,
     )
-    assert device.temperature == '57.00'
+    assert device.temperature == "57.00"
     callback_mock.assert_not_called()
 
     # Poll ran, new data, device updated.
     time.sleep(1.1)
-    assert device.temperature == '66.00'
+    assert device.temperature == "66.00"
     callback_mock.assert_called_with(device)
     callback_mock.reset_mock()
 
@@ -90,20 +90,22 @@ def test_polling(vera_controller_data: VeraControllerData) -> None:
         device_id=DEVICE_TEMP_SENSOR_ID,
         key="temperature",
         value="77.00",
-        push=False
+        push=False,
     )
     callback_mock.assert_not_called()
     time.sleep(1)
     callback_mock.assert_called_with(device)
 
 
-def test_controller_register_unregister(vera_controller_data: VeraControllerData) -> None:
+def test_controller_register_unregister(
+    vera_controller_data: VeraControllerData
+) -> None:
     """Test function."""
     controller = vera_controller_data.controller
     device = cast(VeraSensor, controller.get_device_by_id(DEVICE_TEMP_SENSOR_ID))
     callback_mock = MagicMock()
 
-    assert device.temperature == '57.00'
+    assert device.temperature == "57.00"
 
     # Device not registered, device is not update.
     update_device(
@@ -112,7 +114,7 @@ def test_controller_register_unregister(vera_controller_data: VeraControllerData
         key="temperature",
         value="66.00",
     )
-    assert device.temperature == '57.00'
+    assert device.temperature == "57.00"
     callback_mock.assert_not_called()
     callback_mock.mock_reset()
 
@@ -124,7 +126,7 @@ def test_controller_register_unregister(vera_controller_data: VeraControllerData
         key="temperature",
         value="66.00",
     )
-    assert device.temperature == '66.00'
+    assert device.temperature == "66.00"
     callback_mock.assert_called_with(device)
     callback_mock.reset_mock()
 
@@ -136,15 +138,14 @@ def test_controller_register_unregister(vera_controller_data: VeraControllerData
         key="temperature",
         value="111111.00",
     )
-    assert device.temperature == '66.00'
+    assert device.temperature == "66.00"
     callback_mock.assert_not_called()
 
 
-@pytest.mark.parametrize("device_id", (
-    DEVICE_DOOR_SENSOR_ID,
-    DEVICE_MOTION_SENSOR_ID,
-))
-def test_binary_sensor(vera_controller_data: VeraControllerData, device_id: int) -> None:
+@pytest.mark.parametrize("device_id", (DEVICE_DOOR_SENSOR_ID, DEVICE_MOTION_SENSOR_ID))
+def test_binary_sensor(
+    vera_controller_data: VeraControllerData, device_id: int
+) -> None:
     """Test function."""
     controller = vera_controller_data.controller
     device = cast(VeraBinarySensor, controller.get_device_by_id(device_id))
@@ -153,11 +154,21 @@ def test_binary_sensor(vera_controller_data: VeraControllerData, device_id: int)
     assert device.is_tripped is False
     assert device.is_switched_on(refresh=True) is False
 
-    update_device(controller_data=vera_controller_data, device_id=device_id, key="tripped", value="1")
+    update_device(
+        controller_data=vera_controller_data,
+        device_id=device_id,
+        key="tripped",
+        value="1",
+    )
     assert device.is_tripped is True
     assert device.is_switched_on() is False
 
-    update_device(controller_data=vera_controller_data, device_id=device_id, key="status", value="1")
+    update_device(
+        controller_data=vera_controller_data,
+        device_id=device_id,
+        key="status",
+        value="1",
+    )
     assert device.is_switched_on() is True
 
 
@@ -189,7 +200,12 @@ def test_thermostat(vera_controller_data: VeraControllerData) -> None:
     device.set_temperature(72)
     assert device.get_current_goal_temperature() == 72
 
-    update_device(controller_data=vera_controller_data, device_id=DEVICE_THERMOSTAT_ID, key="temperature", value=65)
+    update_device(
+        controller_data=vera_controller_data,
+        device_id=DEVICE_THERMOSTAT_ID,
+        key="temperature",
+        value=65,
+    )
     assert device.get_current_temperature() == 65
 
     device.turn_auto_on()
@@ -263,17 +279,21 @@ def test_dimmer(vera_controller_data: VeraControllerData) -> None:
 def test_scene_controller(vera_controller_data: VeraControllerData) -> None:
     """Test function."""
     controller = vera_controller_data.controller
-    device = cast(VeraSceneController, controller.get_device_by_id(
-        DEVICE_SCENE_CONTROLLER_ID
-    ))
+    device = cast(
+        VeraSceneController, controller.get_device_by_id(DEVICE_SCENE_CONTROLLER_ID)
+    )
     controller.register(device, lambda: None)
 
     assert device.get_last_scene_id(refresh=True) == "1234"
     assert device.get_last_scene_time(refresh=True) == "10000012"
     assert device.should_poll is True
 
-    update_device(vera_controller_data, DEVICE_SCENE_CONTROLLER_ID, "LastSceneID", "Id2")
-    update_device(vera_controller_data, DEVICE_SCENE_CONTROLLER_ID, "LastSceneTime", "4444")
+    update_device(
+        vera_controller_data, DEVICE_SCENE_CONTROLLER_ID, "LastSceneID", "Id2"
+    )
+    update_device(
+        vera_controller_data, DEVICE_SCENE_CONTROLLER_ID, "LastSceneTime", "4444"
+    )
     assert device.get_last_scene_id(refresh=False) == "1234"
     assert device.get_last_scene_time(refresh=False) == "10000012"
     assert device.get_last_scene_id(refresh=True) == "Id2"
@@ -281,14 +301,15 @@ def test_scene_controller(vera_controller_data: VeraControllerData) -> None:
 
 
 SensorParam = NamedTuple(
-    "SensorParam", (
+    "SensorParam",
+    (
         ("device_id", int),
         ("device_property", str),
         ("initial_value", Any),
         ("new_value", Any),
         ("variable", str),
         ("variable_value", Any),
-    )
+    ),
 )
 
 
@@ -343,12 +364,9 @@ SensorParam = NamedTuple(
             variable="watts",
             variable_value="50",
         ),
-    )
+    ),
 )
-def test_sensor(
-    vera_controller_data: VeraControllerData,
-    param: SensorParam
-) -> None:
+def test_sensor(vera_controller_data: VeraControllerData, param: SensorParam) -> None:
     """Test function."""
     controller = vera_controller_data.controller
     device = cast(VeraSensor, controller.get_device_by_id(param.device_id))
@@ -364,11 +382,9 @@ def test_sensor(
     assert getattr(device, param.device_property) == param.new_value
 
 
-@pytest.mark.parametrize("device_id", (
-    DEVICE_SWITCH_ID,
-    DEVICE_SWITCH2_ID,
-    DEVICE_GARAGE_DOOR_ID,
-))
+@pytest.mark.parametrize(
+    "device_id", (DEVICE_SWITCH_ID, DEVICE_SWITCH2_ID, DEVICE_GARAGE_DOOR_ID)
+)
 def test_switch(vera_controller_data: VeraControllerData, device_id: int) -> None:
     """Test function."""
     controller = vera_controller_data.controller
