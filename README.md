@@ -69,16 +69,10 @@ logger:
 
 Developing
 -------
+Setup and builds are fully automated. You can run build pipeline locally by running.
 ~~~~
-# Setup the environment.
-python3 -m venv venv
-source venv/bin/activate
-python setup.py install
-
-# Make code changes.
-
-# Test the changes.
-pytest
+# Setup, build, lint and test the code.
+./scripts/build.sh
 ~~~~
 
 License
