@@ -58,9 +58,9 @@ echo "===Lint with flake8==="
 flake8
 
 
-#echo
-#echo "===Lint with mypy==="
-#mypy .
+echo
+echo "===Lint with mypy==="
+mypy .
 
 
 echo

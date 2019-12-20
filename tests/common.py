@@ -3,9 +3,10 @@
 from copy import deepcopy
 import json
 import re
-from typing import Any, NamedTuple, Optional, Tuple
+from typing import Any, List, NamedTuple, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
+from _pytest.fixtures import FixtureRequest
 from pyvera import (
     CATEGORY_ARMABLE,
     CATEGORY_CURTAIN,
@@ -36,7 +37,7 @@ VeraControllerData = NamedTuple(
 )
 
 
-def new_vera_api_data():
+def new_vera_api_data() -> VeraApiData:
     """Create new api data object."""
     return VeraApiData(
         sdata=deepcopy(RESPONSE_SDATA),
@@ -45,9 +46,9 @@ def new_vera_api_data():
     )
 
 
-def find_device_object(device_id: int, data_list: list) -> Optional[dict]:
+def find_device_object(device_id: int, data_list: List[dict]) -> Optional[dict]:
     """Find a vera device object in a list of devices."""
-    for device in data_list or []:
+    for device in data_list:
         if device.get("id") == device_id:
             return device
 
@@ -56,18 +57,23 @@ def find_device_object(device_id: int, data_list: list) -> Optional[dict]:
 
 def get_device(device_id: int, api_data: VeraApiData) -> Optional[dict]:
     """Find a vera device."""
-    return find_device_object(device_id, api_data.sdata.get("devices"))
+    return find_device_object(device_id, api_data.sdata.get("devices", []))
 
 
 def get_device_status(device_id: int, api_data: VeraApiData) -> Optional[dict]:
     """Find a vera device status."""
-    return find_device_object(device_id, api_data.status.get("devices"))
+    return find_device_object(device_id, api_data.status.get("devices", []))
 
 
-def set_device_status(device_id: int, api_data: VeraApiData, key: str, value: Any):
+def set_device_status(
+    device_id: int, api_data: VeraApiData, key: str, value: Any
+) -> None:
     """Set the status of a vera device."""
     device = get_device(device_id, api_data)
     device_status = get_device_status(device_id, api_data)
+
+    if not device or not device_status:
+        return
 
     device_status[key] = value
     device[key] = value
@@ -75,7 +81,9 @@ def set_device_status(device_id: int, api_data: VeraApiData, key: str, value: An
     device_status["states"] = device_status["states"] or []
 
     # Get the current state or create a new one.
-    state = next([s for s in device_status["states"] if s["variable"] == key]) or {}
+    state: dict = next(
+        iter([s for s in device_status["states"] if s["variable"] == key]), {}
+    )
 
     # Update current states to exclude the one we are changing.
     device_status["states"] = [
@@ -83,11 +91,17 @@ def set_device_status(device_id: int, api_data: VeraApiData, key: str, value: An
     ]
 
     # Add the updated state to the list of states.
-    device_status["state"].append(state.update({"variable": key, "value": value}))
+    state.update({"variable": key, "value": value})
+    device_states = device_status["state"] = device_status.get("state", [])
+    device_states.append(state)
 
 
 def update_device(
-    controller_data: VeraControllerData, device_id: int, key: str, value: Any, push=True
+    controller_data: VeraControllerData,
+    device_id: int,
+    key: str,
+    value: Any,
+    push: bool = True,
 ) -> None:
     """Update a vera device with a specific key/value."""
     device = get_device(device_id, controller_data.api_data)
@@ -96,7 +110,10 @@ def update_device(
     device_status = get_device_status(device_id, controller_data.api_data)
     assert device_status, "Failed to find device status with device id %d" % device_id
 
-    controller_data.api_data.lu_sdata.get("devices").append(device)
+    lu_data = controller_data.api_data.lu_sdata
+    lu_data_devices = lu_data["devices"] = lu_data.get("devices", [])
+    lu_data_devices.append(device)
+
     controller_data.api_data.lu_sdata["loadtime"] = "now"
     controller_data.api_data.lu_sdata["dataversion"] += 1
 
@@ -109,7 +126,9 @@ def update_device(
     device_status["states"] = device_status["states"] or []
 
     # Get the current state or create a new one.
-    state = next(iter([s for s in device_status["states"] if s["variable"] == key]), {})
+    state: dict = next(
+        iter([s for s in device_status["states"] if s["variable"] == key]), {}
+    )
 
     # Update current states to exclude the one we are changing.
     device_status["states"] = [
@@ -130,7 +149,10 @@ def publish_device_status(controller: VeraController, device_status: dict) -> No
     controller.subscription_registry._event([device_status], [])
 
 
-def handle_lu_action(payload: dict, api_data: VeraApiData) -> Tuple[int, dict, str]:
+ResponsesResponse = Tuple[int, dict, str]
+
+
+def handle_lu_action(payload: dict, api_data: VeraApiData) -> ResponsesResponse:
     """Handle lu_action requests."""
     params = payload.copy()
     params.pop("id")
@@ -191,8 +213,9 @@ def handle_lu_action(payload: dict, api_data: VeraApiData) -> Tuple[int, dict, s
     ):
         status_variable_name = "CurrentColor"
 
-    device = get_device(device_id, api_data)
-    status = get_device_status(device_id, api_data)
+    device = get_device(device_id, api_data) or {}
+    status = get_device_status(device_id, api_data) or {}
+    status["states"] = []
 
     # Update the device and status objects.
     if status_variable_name is not None:
@@ -217,33 +240,34 @@ def handle_lu_action(payload: dict, api_data: VeraApiData) -> Tuple[int, dict, s
     return 200, {}, ""
 
 
-def handle_variable_get(payload: dict, api_data: VeraApiData) -> Tuple[int, dict, str]:
+def handle_variable_get(payload: dict, api_data: VeraApiData) -> ResponsesResponse:
     """Handle variable_get requests."""
-    device_id = int(payload.get("DeviceNum"))
+    device_id = payload.get("DeviceNum")
     variable = payload.get("Variable")
 
-    status = get_device_status(device_id, api_data)
-    for state in status.get("states", []):
-        if state.get("variable") == variable:
-            # return state.get("value")
-            return 200, {}, state.get("value")
+    if device_id and variable:
+        status = get_device_status(int(device_id), api_data) or {}
+        for state in status.get("states", []):
+            if state.get("variable") == variable:
+                # return state.get("value")
+                return 200, {}, state.get("value")
 
     return 200, {}, ""
 
 
 def handle_request(
     req: requests.PreparedRequest, api_data: VeraApiData
-) -> Tuple[int, dict, str]:
+) -> ResponsesResponse:
     """Handle a request for data from the controller."""
     url_parts = urlparse(req.url)
-    qs_parts = parse_qs(url_parts.query)
+    qs_parts: dict = parse_qs(url_parts.query)
     payload = {}
     for key, value in qs_parts.items():
         payload[key] = value[0]
 
     payload_id = payload.get("id")
 
-    response = None
+    response: ResponsesResponse = (200, {}, "")
     if payload_id == "sdata":
         response = 200, {}, json.dumps(api_data.sdata)
     if payload_id == "status":
@@ -263,7 +287,7 @@ def handle_request(
 class VeraControllerFactory:
     """Manages the creation of mocked controllers."""
 
-    def __init__(self, pytest_req, rsps: responses.RequestsMock):
+    def __init__(self, pytest_req: FixtureRequest, rsps: responses.RequestsMock):
         """Init object."""
         self.pytest_req = pytest_req
         self.rsps = rsps
@@ -272,7 +296,7 @@ class VeraControllerFactory:
         """Create new instance of controller."""
         base_url = "http://127.0.0.1:123"
 
-        def callback(req):
+        def callback(req: requests.PreparedRequest) -> ResponsesResponse:
             nonlocal api_data
             return handle_request(req, api_data)
 
@@ -402,7 +426,7 @@ RESPONSE_SDATA = {
             "room": 0,
             "parent": 51,
             "configured": "0",
-            "temperature": "57.00",
+            "temperature": 57.00,
         },
         {
             "name": "Dimmer 1",
@@ -686,7 +710,7 @@ RESPONSE_SDATA = {
     ],
 }
 
-RESPONSE_STATUS = {
+RESPONSE_STATUS: dict = {
     "LoadTime": None,
     "DataVersion": 1,
     "startup": {"tasks": []},
@@ -853,6 +877,6 @@ RESPONSE_STATUS = {
     ],
 }
 
-RESPONSE_LU_SDATA = {"loadtime": None, "dataversion": 1, "devices": []}
+RESPONSE_LU_SDATA: dict = {"loadtime": None, "dataversion": 1, "devices": []}
 
-RESPONSE_SCENES = {}
+RESPONSE_SCENES: dict = {}

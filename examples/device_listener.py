@@ -9,11 +9,11 @@ import sys
 import time
 
 # Import pyvera
-from pyvera import VeraController
+from pyvera import VeraController, VeraDevice
 
 
 # Define a callback that runs each time a device changes state
-def device_info_callback(vera_device):
+def device_info_callback(vera_device: VeraDevice) -> None:
     """Print device info."""
     # Do what we want with the changed device information
     print(
@@ -28,7 +28,7 @@ def device_info_callback(vera_device):
     )
 
 
-def main():
+def main() -> None:
     """Run main code entrypoint."""
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 

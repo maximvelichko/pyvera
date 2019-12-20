@@ -1,21 +1,20 @@
-"""
-Vera Controller Python API.
+"""Vera Controller Python API.
 
 This lib is designed to simplify communication with Vera controllers
 """
+import collections
 from datetime import datetime
+import json
 import logging
 import os
 import shlex
-import sys
+import threading
 import time
+from typing import Any, Callable, DefaultDict, Dict, List, Optional, Tuple, Union, cast
 
 import requests
 
-from .common import init_logging
-from .subscribe import PyveraError, SubscriptionRegistry
-
-__author__ = "jamespcole"
+TIMESTAMP_NONE = {"dataversion": 1, "loadtime": 0}
 
 # Time to block on Vera poll if there are no changes in seconds
 SUBSCRIPTION_WAIT = 30
@@ -45,9 +44,44 @@ CATEGORY_UV_SENSOR = 28
 CATEGORY_GARAGE_DOOR = 32
 
 
+# How long to wait before retrying Vera
+SUBSCRIPTION_RETRY = 9
+
+# Vera state codes see http://wiki.micasaverde.com/index.php/Luup_Requests
+STATE_NO_JOB = -1
+STATE_JOB_WAITING_TO_START = 0
+STATE_JOB_IN_PROGRESS = 1
+STATE_JOB_ERROR = 2
+STATE_JOB_ABORTED = 3
+STATE_JOB_DONE = 4
+STATE_JOB_WAITING_FOR_CALLBACK = 5
+STATE_JOB_REQUEUE = 6
+STATE_JOB_PENDING_DATA = 7
+
+STATE_NOT_PRESENT = 999
+
+ChangedDevicesValue = Tuple[List[dict], dict]
+LockCode = Tuple[str, str, str]
+UserCode = Tuple[str, str]
+SubscriptionCallback = Callable[["VeraDevice"], None]
+
+
+def init_logging(logger: Any, logger_level: Optional[str]) -> None:
+    """Initialize the logger."""
+    # Set logging level (such as INFO, DEBUG, etc) via an environment variable
+    # Defaults to WARNING log level unless PYVERA_LOGLEVEL variable exists
+    if logger_level:
+        logger.setLevel(logger_level)
+        log_handler = logging.StreamHandler()
+        log_handler.setFormatter(
+            logging.Formatter("%(levelname)s@{%(name)s:%(lineno)d} - %(message)s")
+        )
+        logger.addHandler(log_handler)
+
+
 # Set up the console logger for debugging
 LOG = logging.getLogger(__name__)
-init_logging(LOG, os.environ.get("PYVERA_LOGLEVEL", None))
+init_logging(LOG, os.environ.get("PYVERA_LOGLEVEL"))
 LOG.debug("DEBUG logging is ON")
 
 
@@ -57,29 +91,29 @@ class VeraController:
 
     temperature_units = "C"
 
-    def __init__(self, base_url):
-        """Setup Vera controller at the given URL.
+    def __init__(self, base_url: str):
+        """Init Vera controller at the given URL.
 
         base_url: Vera API URL, eg http://vera:3480.
         """
         self.base_url = base_url
-        self.devices = []
-        self.scenes = []
+        self.devices: List[VeraDevice] = []
+        self.scenes: List[VeraScene] = []
         self.temperature_units = "C"
         self.version = None
         self.model = None
         self.serial_number = None
-        self.device_services_map = None
+        self.device_services_map: Dict[int, List[dict]] = {}
         self.subscription_registry = SubscriptionRegistry(self)
-        self.categories = {}
-        self.device_id_map = {}
+        self.categories: Dict[int, str] = {}
+        self.device_id_map: Dict[int, VeraDevice] = {}
 
-    def data_request(self, payload, timeout=TIMEOUT):
+    def data_request(self, payload: dict, timeout: int = TIMEOUT) -> requests.Response:
         """Perform a data_request and return the result."""
         request_url = self.base_url + "/data_request"
         return requests.get(request_url, timeout=timeout, params=payload)
 
-    def get_simple_devices_info(self):
+    def get_simple_devices_info(self) -> None:
         """Get basic device info from Vera."""
         j = self.data_request({"id": "sdata"}).json()
 
@@ -105,14 +139,14 @@ class VeraController:
             dev["categoryName"] = self.categories.get(dev.get("category"))
             self.device_id_map[dev.get("id")] = dev
 
-    def get_scenes(self):
+    def get_scenes(self) -> List["VeraScene"]:
         """Get list of scenes."""
 
         self.get_simple_devices_info()
 
         return self.scenes
 
-    def get_device_by_name(self, device_name):
+    def get_device_by_name(self, device_name: str) -> Optional["VeraDevice"]:
         """Search the list of connected devices by name.
 
         device_name param is the string name of the device
@@ -131,7 +165,7 @@ class VeraController:
 
         return found_device
 
-    def get_device_by_id(self, device_id):
+    def get_device_by_id(self, device_id: int) -> Optional["VeraDevice"]:
         """Search the list of connected devices by ID.
 
         device_id param is the integer ID of the device
@@ -150,7 +184,7 @@ class VeraController:
 
         return found_device
 
-    def get_devices(self, category_filter=""):
+    def get_devices(self, category_filter: str = "") -> List["VeraDevice"]:
         """Get list of connected devices.
 
         category_filter param is an array of strings.  If specified, this
@@ -162,11 +196,11 @@ class VeraController:
         # all the info we need
         self.get_simple_devices_info()
 
-        json = self.data_request({"id": "status", "output_format": "json"}).json()
+        json_data = self.data_request({"id": "status", "output_format": "json"}).json()
 
         self.devices = []
-        items = json.get("devices")
-        alerts = json.get("alerts", ())
+        items = json_data.get("devices")
+        alerts = json_data.get("alerts", ())
 
         for item in items:
             item["deviceInfo"] = self.device_id_map.get(item.get("id"))
@@ -175,6 +209,7 @@ class VeraController:
             ]
             device_category = item.get("deviceInfo", {}).get("category")
 
+            device: VeraDevice
             if device_category == CATEGORY_DIMMER:
                 device = VeraDimmer(item, item_alerts, self)
             elif device_category in (CATEGORY_SWITCH, CATEGORY_VERA_SIREN):
@@ -224,7 +259,7 @@ class VeraController:
             )
         ]
 
-    def refresh_data(self):
+    def refresh_data(self) -> Dict[int, "VeraDevice"]:
         """Refresh mapping from device ids to devices."""
         # Note: This function is side-effect free and appears to be unused.
         # Safe to erase?
@@ -253,7 +288,7 @@ class VeraController:
 
         return device_id_map
 
-    def map_services(self):
+    def map_services(self) -> None:
         """Get full Vera device service info."""
         # Note: This function updates the device_services_map, but that map does
         # not appear to be used.  Safe to erase?
@@ -270,7 +305,7 @@ class VeraController:
 
         self.device_services_map = service_map
 
-    def get_changed_devices(self, timestamp):
+    def get_changed_devices(self, timestamp: dict) -> ChangedDevicesValue:
         """Get data since last timestamp.
 
         This function blocks until a change is returned by the Vera, or the
@@ -320,9 +355,9 @@ class VeraController:
             "loadtime": result.get("loadtime", 0),
             "dataversion": result.get("dataversion", 1),
         }
-        return [device_data, timestamp]
+        return device_data, timestamp
 
-    def get_alerts(self, timestamp):
+    def get_alerts(self, timestamp: dict) -> List[dict]:
         """Get alerts that have triggered since last timestamp.
 
         Note that unlike get_changed_devices, this is non-blocking.
@@ -376,15 +411,15 @@ class VeraController:
     # be invoked in the context of the subscription thread.  Only access Pyvera
     # from those callbacks from that point forwards.
 
-    def start(self):
+    def start(self) -> None:
         """Start the subscription thread."""
         self.subscription_registry.start()
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the subscription thread."""
         self.subscription_registry.stop()
 
-    def register(self, device, callback):
+    def register(self, device: "VeraDevice", callback: SubscriptionCallback) -> None:
         """Register a device and callback with the subscription service.
 
         The callback will be called from the subscription thread when the device
@@ -392,27 +427,31 @@ class VeraController:
         """
         self.subscription_registry.register(device, callback)
 
-    def unregister(self, device, callback):
+    def unregister(self, device: "VeraDevice", callback: SubscriptionCallback) -> None:
         """Unregister a device and callback with the subscription service."""
         self.subscription_registry.unregister(device, callback)
 
 
 # pylint: disable=too-many-public-methods
 class VeraDevice:
-    """ Class to represent each vera device."""
+    """Class to represent each vera device."""
 
-    def __init__(self, json_obj, json_alerts, vera_controller):
-        """Setup a Vera device."""
+    def __init__(
+        self, json_obj: dict, json_alerts: List[dict], vera_controller: VeraController
+    ):
+        """Init object."""
         self.json_state = json_obj
         self.device_id = self.json_state.get("id")
         self.vera_controller = vera_controller
         self.name = ""
+        self.alerts: List[VeraAlert] = []
         self.set_alerts(json_alerts)
 
         if self.json_state.get("deviceInfo"):
-            self.category = self.json_state.get("deviceInfo").get("category")
-            self.category_name = self.json_state.get("deviceInfo").get("categoryName")
-            self.name = self.json_state.get("deviceInfo").get("name")
+            device_info = self.json_state.get("deviceInfo", {})
+            self.category = device_info.get("category")
+            self.category_name = device_info.get("categoryName")
+            self.name = device_info.get("name")
         else:
             self.category_name = ""
 
@@ -422,79 +461,79 @@ class VeraDevice:
             else:
                 self.name = "Vera Device " + str(self.device_id)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Get a string representation."""
-        if sys.version_info >= (3, 0):
-            return "{} (id={} category={} name={})".format(
-                self.__class__.__name__, self.device_id, self.category_name, self.name
-            )
-        return "{} (id={} category={} name={})".format(
-            self.__class__.__name__, self.device_id, self.category_name, self.name
-        ).encode("utf-8")
+        return f"{self.__class__.__name__} (id={self.device_id} category={self.category_name} name={self.name})"
 
     @property
-    def switch_service(self):
+    def switch_service(self) -> str:
         """Vera service string for switch."""
         return "urn:upnp-org:serviceId:SwitchPower1"
 
     @property
-    def dimmer_service(self):
+    def dimmer_service(self) -> str:
         """Vera service string for dimmer."""
         return "urn:upnp-org:serviceId:Dimming1"
 
     @property
-    def security_sensor_service(self):
+    def security_sensor_service(self) -> str:
         """Vera service string for armable sensors."""
         return "urn:micasaverde-com:serviceId:SecuritySensor1"
 
     @property
-    def window_covering_service(self):
+    def window_covering_service(self) -> str:
         """Vera service string for window covering service."""
         return "urn:upnp-org:serviceId:WindowCovering1"
 
     @property
-    def lock_service(self):
+    def lock_service(self) -> str:
         """Vera service string for lock service."""
         return "urn:micasaverde-com:serviceId:DoorLock1"
 
     @property
-    def thermostat_operating_service(self):
+    def thermostat_operating_service(self) -> Tuple[str]:
         """Vera service string HVAC operating mode."""
         return ("urn:upnp-org:serviceId:HVAC_UserOperatingMode1",)
 
     @property
-    def thermostat_fan_service(self):
+    def thermostat_fan_service(self) -> str:
         """Vera service string HVAC fan operating mode."""
         return "urn:upnp-org:serviceId:HVAC_FanOperatingMode1"
 
     @property
-    def thermostat_cool_setpoint(self):
+    def thermostat_cool_setpoint(self) -> str:
         """Vera service string Temperature Setpoint1 Cool."""
         return "urn:upnp-org:serviceId:TemperatureSetpoint1_Cool"
 
     @property
-    def thermostat_heat_setpoint(self):
+    def thermostat_heat_setpoint(self) -> str:
         """Vera service string Temperature Setpoint Heat."""
         return "urn:upnp-org:serviceId:TemperatureSetpoint1_Heat"
 
     @property
-    def thermostat_setpoint(self):
+    def thermostat_setpoint(self) -> str:
         """Vera service string Temperature Setpoint."""
         return "urn:upnp-org:serviceId:TemperatureSetpoint1"
 
     @property
-    def color_service(self):
+    def color_service(self) -> str:
         """Vera service string for color."""
         return "urn:micasaverde-com:serviceId:Color1"
 
-    def vera_request(self, **kwargs):
+    def vera_request(self, **kwargs: Any) -> requests.Response:
         """Perfom a vera_request for this device."""
         request_payload = {"output_format": "json", "DeviceNum": self.device_id}
         request_payload.update(kwargs)
 
         return self.vera_controller.data_request(request_payload)
 
-    def set_service_value(self, service_id, set_name, parameter_name, value):
+    def set_service_value(
+        self,
+        service_id: Union[str, Tuple[str, ...]],
+        set_name: str,
+        parameter_name: str,
+        value: Any,
+    ) -> None:
         """Set a variable on the vera device.
 
         This will call the Vera api to change device state.
@@ -512,7 +551,7 @@ class VeraDevice:
             result.text,
         )
 
-    def call_service(self, service_id, action):
+    def call_service(self, service_id: str, action: str) -> requests.Response:
         """Call a Vera service.
 
         This will call the Vera api to change device state.
@@ -525,50 +564,50 @@ class VeraDevice:
         )
         return result
 
-    def set_cache_value(self, name, value):
+    def set_cache_value(self, name: str, value: Any) -> None:
         """Set a variable in the local state dictionary.
 
         This does not change the physical device. Useful if you want the
         device state to refect a new value which has not yet updated from
         Vera.
         """
-        dev_info = self.json_state.get("deviceInfo")
+        dev_info = self.json_state.get("deviceInfo", {})
         if dev_info.get(name.lower()) is None:
             LOG.error("Could not set %s for %s (key does not exist).", name, self.name)
             LOG.error("- dictionary %s", dev_info)
             return
         dev_info[name.lower()] = str(value)
 
-    def set_cache_complex_value(self, name, value):
+    def set_cache_complex_value(self, name: str, value: Any) -> None:
         """Set a variable in the local complex state dictionary.
 
         This does not change the physical device. Useful if you want the
         device state to refect a new value which has not yet updated from
         Vera.
         """
-        for item in self.json_state.get("states"):
+        for item in self.json_state.get("states", []):
             if item.get("variable") == name:
                 item["value"] = str(value)
 
-    def get_complex_value(self, name):
+    def get_complex_value(self, name: str) -> Any:
         """Get a value from the service dictionaries.
 
         It's best to use get_value if it has the data you require since
         the vera subscription only updates data in dev_info.
         """
-        for item in self.json_state.get("states"):
+        for item in self.json_state.get("states", []):
             if item.get("variable") == name:
                 return item.get("value")
         return None
 
-    def get_all_values(self):
+    def get_all_values(self) -> dict:
         """Get all values from the deviceInfo area.
 
         The deviceInfo data is updated by the subscription service.
         """
-        return self.json_state.get("deviceInfo")
+        return cast(dict, self.json_state.get("deviceInfo"))
 
-    def get_value(self, name):
+    def get_value(self, name: str) -> Any:
         """Get a value from the dev_info area.
 
         This is the common Vera data and is the best place to get state from
@@ -578,18 +617,17 @@ class VeraDevice:
         """
         return self.get_strict_value(name.lower())
 
-    def get_strict_value(self, name):
-        """Get a case-sensitive keys value from the dev_info area.
-        """
-        dev_info = self.json_state.get("deviceInfo")
+    def get_strict_value(self, name: str) -> Any:
+        """Get a case-sensitive keys value from the dev_info area."""
+        dev_info = self.json_state.get("deviceInfo", {})
         return dev_info.get(name, None)
 
-    def refresh_complex_value(self, name):
+    def refresh_complex_value(self, name: str) -> Any:
         """Refresh a value from the service dictionaries.
 
         It's best to use get_value / refresh if it has the data you need.
         """
-        for item in self.json_state.get("states"):
+        for item in self.json_state.get("states", []):
             if item.get("variable") == name:
                 service_id = item.get("service")
                 result = self.vera_request(
@@ -605,17 +643,15 @@ class VeraDevice:
                 return item.get("value")
         return None
 
-    def set_alerts(self, json_alerts):
-        """Convert JSON alert data to VeraAlerts
-        """
+    def set_alerts(self, json_alerts: List[dict]) -> None:
+        """Convert JSON alert data to VeraAlerts."""
         self.alerts = [VeraAlert(json_alert, self) for json_alert in json_alerts]
 
-    def get_alerts(self):
-        """Get any alerts present during the most recent poll cycle
-        """
+    def get_alerts(self) -> List["VeraAlert"]:
+        """Get any alerts present during the most recent poll cycle."""
         return self.alerts
 
-    def refresh(self):
+    def refresh(self) -> None:
         """Refresh the dev_info data used by get_value.
 
         Only needed if you're not using subscriptions.
@@ -626,62 +662,62 @@ class VeraDevice:
             if device_data.get("id") == self.device_id:
                 self.update(device_data)
 
-    def update(self, params):
+    def update(self, params: dict) -> None:
         """Update the dev_info data from a dictionary.
 
         Only updates if it already exists in the device.
         """
-        dev_info = self.json_state.get("deviceInfo")
+        dev_info = self.json_state.get("deviceInfo", {})
         dev_info.update({k: params[k] for k in params if dev_info.get(k)})
 
     @property
-    def is_armable(self):
+    def is_armable(self) -> bool:
         """Device is armable."""
         return self.get_value("Armed") is not None
 
     @property
-    def is_armed(self):
+    def is_armed(self) -> bool:
         """Device is armed now."""
-        return self.get_value("Armed") == "1"
+        return cast(str, self.get_value("Armed")) == "1"
 
     @property
-    def is_dimmable(self):
+    def is_dimmable(self) -> bool:
         """Device is dimmable."""
-        return self.category == CATEGORY_DIMMER
+        return cast(int, self.category) == CATEGORY_DIMMER
 
     @property
-    def is_trippable(self):
+    def is_trippable(self) -> bool:
         """Device is trippable."""
         return self.get_value("Tripped") is not None
 
     @property
-    def is_tripped(self):
+    def is_tripped(self) -> bool:
         """Device is tripped now."""
-        return self.get_value("Tripped") == "1"
+        return cast(str, self.get_value("Tripped")) == "1"
 
     @property
-    def has_battery(self):
+    def has_battery(self) -> bool:
         """Device has a battery."""
         return self.get_value("BatteryLevel") is not None
 
     @property
-    def battery_level(self):
+    def battery_level(self) -> int:
         """Battery level as a percentage."""
-        return self.get_value("BatteryLevel")
+        return cast(int, self.get_value("BatteryLevel"))
 
     @property
-    def last_trip(self):
+    def last_trip(self) -> str:
         """Time device last tripped."""
         # Vera seems not to update this for my device!
-        return self.get_value("LastTrip")
+        return cast(str, self.get_value("LastTrip"))
 
     @property
-    def light(self):
+    def light(self) -> int:
         """Light level in lux."""
-        return self.get_value("Light")
+        return cast(int, self.get_value("Light"))
 
     @property
-    def level(self):
+    def level(self) -> int:
         """Get level from vera."""
         # Used for dimmers, curtains
         # Have seen formats of 10, 0.0 and "0%"!
@@ -697,45 +733,45 @@ class VeraDevice:
         return 0
 
     @property
-    def temperature(self):
-        """Temperature.
+    def temperature(self) -> float:
+        """Get the temperature.
 
         You can get units from the controller.
         """
-        return self.get_value("Temperature")
+        return cast(float, self.get_value("Temperature"))
 
     @property
-    def humidity(self):
-        """Humidity level in percent."""
-        return self.get_value("Humidity")
+    def humidity(self) -> float:
+        """Get the humidity level in percent."""
+        return cast(float, self.get_value("Humidity"))
 
     @property
-    def power(self):
-        """Current power useage in watts"""
-        return self.get_value("Watts")
+    def power(self) -> int:
+        """Get the current power useage in watts."""
+        return cast(int, self.get_value("Watts"))
 
     @property
-    def energy(self):
-        """Energy usage in kwh"""
-        return self.get_value("kwh")
+    def energy(self) -> int:
+        """Get the energy usage in kwh."""
+        return cast(int, self.get_value("kwh"))
 
     @property
-    def room_id(self):
-        """Vera Room ID"""
-        return self.get_value("room")
+    def room_id(self) -> int:
+        """Get the Vera Room ID."""
+        return cast(int, self.get_value("room"))
 
     @property
-    def comm_failure(self):
-        """Communication Failure Flag"""
-        return self.get_strict_value("commFailure") != "0"
+    def comm_failure(self) -> bool:
+        """Return the Communication Failure Flag."""
+        return cast(str, self.get_strict_value("commFailure")) != "0"
 
     @property
-    def vera_device_id(self):
-        """The ID Vera uses to refer to the device."""
-        return self.device_id
+    def vera_device_id(self) -> int:
+        """Get the ID Vera uses to refer to the device."""
+        return cast(int, self.device_id)
 
     @property
-    def should_poll(self):
+    def should_poll(self) -> bool:
         """Whether polling is needed if using subscriptions for this device."""
         return False
 
@@ -743,20 +779,20 @@ class VeraDevice:
 class VeraSwitch(VeraDevice):
     """Class to add switch functionality."""
 
-    def set_switch_state(self, state):
+    def set_switch_state(self, state: int) -> None:
         """Set the switch state, also update local state."""
         self.set_service_value(self.switch_service, "Target", "newTargetValue", state)
         self.set_cache_value("Status", state)
 
-    def switch_on(self):
+    def switch_on(self) -> None:
         """Turn the switch on, also update local state."""
         self.set_switch_state(1)
 
-    def switch_off(self):
+    def switch_off(self) -> None:
         """Turn the switch off, also update local state."""
         self.set_switch_state(0)
 
-    def is_switched_on(self, refresh=False):
+    def is_switched_on(self, refresh: bool = False) -> bool:
         """Get switch state.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
@@ -765,21 +801,21 @@ class VeraSwitch(VeraDevice):
         if refresh:
             self.refresh()
         val = self.get_value("Status")
-        return val == "1"
+        return cast(str, val) == "1"
 
 
 class VeraDimmer(VeraSwitch):
     """Class to add dimmer functionality."""
 
-    def switch_on(self):
+    def switch_on(self) -> None:
         """Turn the dimmer on."""
         self.set_brightness(254)
 
-    def switch_off(self):
+    def switch_off(self) -> None:
         """Turn the dimmer off."""
         self.set_brightness(0)
 
-    def is_switched_on(self, refresh=False):
+    def is_switched_on(self, refresh: bool = False) -> bool:
         """Get dimmer state.
 
         Refresh data from Vera if refresh is True,
@@ -790,7 +826,7 @@ class VeraDimmer(VeraSwitch):
             self.refresh()
         return self.get_brightness(refresh) > 0
 
-    def get_brightness(self, refresh=False):
+    def get_brightness(self, refresh: bool = False) -> int:
         """Get dimmer brightness.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
@@ -806,7 +842,7 @@ class VeraDimmer(VeraSwitch):
             brightness = round(percent * 2.55)
         return int(brightness)
 
-    def set_brightness(self, brightness):
+    def set_brightness(self, brightness: int) -> None:
         """Set dimmer brightness.
 
         Converts the Vera level property for dimmable lights from a percentage
@@ -821,7 +857,9 @@ class VeraDimmer(VeraSwitch):
         )
         self.set_cache_value("level", percent)
 
-    def get_color_index(self, colors, refresh=False):
+    def get_color_index(
+        self, colors: List[str], refresh: bool = False
+    ) -> Optional[List[int]]:
         """Get color index.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
@@ -839,7 +877,7 @@ class VeraDimmer(VeraSwitch):
 
         return [sup.index(c) for c in colors]
 
-    def get_color(self, refresh=False):
+    def get_color(self, refresh: bool = False) -> Optional[List[int]]:
         """Get color.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
@@ -858,9 +896,8 @@ class VeraDimmer(VeraSwitch):
         except IndexError:
             return None
 
-    def set_color(self, rgb):
-        """Set dimmer color.
-        """
+    def set_color(self, rgb: List[int]) -> None:
+        """Set dimmer color."""
 
         target = ",".join([str(c) for c in rgb])
         self.set_service_value(
@@ -891,22 +928,22 @@ class VeraDimmer(VeraSwitch):
 class VeraArmableDevice(VeraSwitch):
     """Class to represent a device that can be armed."""
 
-    def set_armed_state(self, state):
+    def set_armed_state(self, state: int) -> None:
         """Set the armed state, also update local state."""
         self.set_service_value(
             self.security_sensor_service, "Armed", "newArmedValue", state
         )
         self.set_cache_value("Armed", state)
 
-    def switch_on(self):
+    def switch_on(self) -> None:
         """Arm the device."""
         self.set_armed_state(1)
 
-    def switch_off(self):
+    def switch_off(self) -> None:
         """Disarm the device."""
         self.set_armed_state(0)
 
-    def is_switched_on(self, refresh=False):
+    def is_switched_on(self, refresh: bool = False) -> bool:
         """Get armed state.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
@@ -915,7 +952,7 @@ class VeraArmableDevice(VeraSwitch):
         if refresh:
             self.refresh()
         val = self.get_value("Armed")
-        return val == "1"
+        return cast(str, val) == "1"
 
 
 class VeraSensor(VeraDevice):
@@ -925,7 +962,7 @@ class VeraSensor(VeraDevice):
 class VeraBinarySensor(VeraDevice):
     """Class to represent an on / off sensor."""
 
-    def is_switched_on(self, refresh=False):
+    def is_switched_on(self, refresh: bool = False) -> bool:
         """Get sensor on off state.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
@@ -934,26 +971,26 @@ class VeraBinarySensor(VeraDevice):
         if refresh:
             self.refresh()
         val = self.get_value("Status")
-        return val == "1"
+        return cast(str, val) == "1"
 
 
 class VeraCurtain(VeraSwitch):
     """Class to add curtains functionality."""
 
-    def open(self):
+    def open(self) -> None:
         """Open the curtains."""
         self.set_level(100)
 
-    def close(self):
+    def close(self) -> None:
         """Close the curtains."""
         self.set_level(0)
 
-    def stop(self):
+    def stop(self) -> int:
         """Open the curtains."""
         self.call_service(self.window_covering_service, "Stop")
-        return self.get_level(True)
+        return cast(int, self.get_level(True))
 
-    def is_open(self, refresh=False):
+    def is_open(self, refresh: bool = False) -> bool:
         """Get curtains state.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
@@ -963,7 +1000,7 @@ class VeraCurtain(VeraSwitch):
             self.refresh()
         return self.get_level(refresh) > 0
 
-    def get_level(self, refresh=False):
+    def get_level(self, refresh: bool = False) -> int:
         """Get open level of the curtains.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
@@ -974,7 +1011,7 @@ class VeraCurtain(VeraSwitch):
             self.refresh()
         return self.level
 
-    def set_level(self, level):
+    def set_level(self, level: int) -> None:
         """Set open level of the curtains.
 
         Scale is 0-100
@@ -993,21 +1030,21 @@ class VeraLock(VeraDevice):
     # this is used since sdata does not return proper job status for locks
     lock_target = None
 
-    def set_lock_state(self, state):
+    def set_lock_state(self, state: int) -> None:
         """Set the lock state, also update local state."""
         self.set_service_value(self.lock_service, "Target", "newTargetValue", state)
         self.set_cache_value("locked", state)
         self.lock_target = (str(state), time.time())
 
-    def lock(self):
+    def lock(self) -> None:
         """Lock the door."""
         self.set_lock_state(1)
 
-    def unlock(self):
+    def unlock(self) -> None:
         """Unlock the device."""
         self.set_lock_state(0)
 
-    def is_locked(self, refresh=False):
+    def is_locked(self, refresh: bool = False) -> bool:
         """Get locked state.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
@@ -1036,14 +1073,14 @@ class VeraLock(VeraDevice):
             )
             self.lock_target = None
 
-        locked = self.get_value("locked") == "1"
+        locked = cast(str, self.get_value("locked")) == "1"
         if self.lock_target is not None:
-            locked = self.lock_target[0] == "1"
+            locked = cast(str, self.lock_target[0]) == "1"
             LOG.debug("Lock still in progress for %s: target=%s", self.name, locked)
         return locked
 
     @staticmethod
-    def _parse_usercode(user_code):
+    def _parse_usercode(user_code: str) -> Optional[UserCode]:
         # Syntax string: UserID="<pin_slot>" UserName="<pin_code_name>"
         # See http://wiki.micasaverde.com/index.php/Luup_UPnP_Variables_and_Actions#DoorLock1
 
@@ -1060,7 +1097,7 @@ class VeraLock(VeraDevice):
             return None
         return (userid, username)
 
-    def get_last_user(self, refresh=False):
+    def get_last_user(self, refresh: bool = False) -> Optional[UserCode]:
         """Get the last used PIN user id.
 
         This is sadly not as useful as it could be.  It will tell you the last
@@ -1070,12 +1107,12 @@ class VeraLock(VeraDevice):
         """
         if refresh:
             self.refresh_complex_value("sl_UserCode")
-        val = self.get_complex_value("sl_UserCode")
+        val = str(self.get_complex_value("sl_UserCode"))
 
         user = self._parse_usercode(val)
         return user
 
-    def get_last_user_alert(self):
+    def get_last_user_alert(self) -> Optional[UserCode]:
         """Get the PIN used for the action in the last poll cycle.
 
         Unlike get_last_user(), this function only returns a result when the
@@ -1089,7 +1126,7 @@ class VeraLock(VeraDevice):
                 return user
         return None
 
-    def get_low_battery_alert(self):
+    def get_low_battery_alert(self) -> int:
         """See if a low battery alert was issued in the last poll cycle."""
         for alert in self.alerts:
             if alert.code == "DL_LOW_BATTERY":
@@ -1114,26 +1151,26 @@ class VeraLock(VeraDevice):
     # with an identical value) by using the Lua function luup.variable_watch().
     # No equivalent appears to exist in the HTTP API.
 
-    def get_pin_failed(self, refresh=False):
-        """True when a bad PIN code was entered."""
+    def get_pin_failed(self, refresh: bool = False) -> bool:
+        """Get if pin failed. True when a bad PIN code was entered."""
         if refresh:
             self.refresh_complex_value("sl_PinFailed")
-        return self.get_complex_value("sl_PinFailed") == "1"
+        return cast(str, self.get_complex_value("sl_PinFailed")) == "1"
 
-    def get_unauth_user(self, refresh=False):
-        """True when a user code entered was outside of a valid date"""
+    def get_unauth_user(self, refresh: bool = False) -> bool:
+        """Get unauth user state. True when a user code entered was outside of a valid date."""
         if refresh:
             self.refresh_complex_value("sl_UnauthUser")
-        return self.get_complex_value("sl_UnauthUser") == "1"
+        return cast(str, self.get_complex_value("sl_UnauthUser")) == "1"
 
-    def get_lock_failed(self, refresh=False):
-        """True when the lock fails to operate"""
+    def get_lock_failed(self, refresh: bool = False) -> bool:
+        """Get lock failed state. True when the lock fails to operate."""
         if refresh:
             self.refresh_complex_value("sl_LockFailure")
-        return self.get_complex_value("sl_LockFailure") == "1"
+        return cast(str, self.get_complex_value("sl_LockFailure")) == "1"
 
-    def get_pin_codes(self, refresh=False):
-        """Get the list of PIN codes
+    def get_pin_codes(self, refresh: bool = False) -> List[LockCode]:
+        """Get the list of PIN codes.
 
         Codes can also be found with self.get_complex_value('PinCodes')
         """
@@ -1147,7 +1184,7 @@ class VeraLock(VeraDevice):
         # Remove the trailing tab
         # ignore the version and next available at the start
         # and split out each set of code attributes
-        raw_code_list = []
+        raw_code_list: List[str] = []
         try:
             raw_code_list = val.rstrip().split("\t")[1:]
         # pylint: disable=broad-except
@@ -1177,15 +1214,16 @@ class VeraLock(VeraDevice):
         return codes
 
     @property
-    def should_poll(self):
+    def should_poll(self) -> bool:
+        """Determine if we should poll for data."""
         return True
 
 
 class VeraThermostat(VeraDevice):
     """Class to represent a thermostat."""
 
-    def set_temperature(self, temp):
-        """Set current goal temperature / setpoint"""
+    def set_temperature(self, temp: float) -> None:
+        """Set current goal temperature / setpoint."""
 
         self.set_service_value(
             self.thermostat_setpoint, "CurrentSetpoint", "NewCurrentSetpoint", temp
@@ -1193,8 +1231,8 @@ class VeraThermostat(VeraDevice):
 
         self.set_cache_value("setpoint", temp)
 
-    def get_current_goal_temperature(self, refresh=False):
-        """Get current goal temperature / setpoint"""
+    def get_current_goal_temperature(self, refresh: bool = False) -> Optional[float]:
+        """Get current goal temperature / setpoint."""
         if refresh:
             self.refresh()
         try:
@@ -1202,8 +1240,8 @@ class VeraThermostat(VeraDevice):
         except (TypeError, ValueError):
             return None
 
-    def get_current_temperature(self, refresh=False):
-        """Get current temperature"""
+    def get_current_temperature(self, refresh: bool = False) -> Optional[float]:
+        """Get current temperature."""
         if refresh:
             self.refresh()
         try:
@@ -1211,73 +1249,73 @@ class VeraThermostat(VeraDevice):
         except (TypeError, ValueError):
             return None
 
-    def set_hvac_mode(self, mode):
-        """Set the hvac mode"""
+    def set_hvac_mode(self, mode: str) -> None:
+        """Set the hvac mode."""
         self.set_service_value(
             self.thermostat_operating_service, "ModeTarget", "NewModeTarget", mode
         )
         self.set_cache_value("mode", mode)
 
-    def get_hvac_mode(self, refresh=False):
-        """Get the hvac mode"""
+    def get_hvac_mode(self, refresh: bool = False) -> Optional[str]:
+        """Get the hvac mode."""
         if refresh:
             self.refresh()
-        return self.get_value("mode")
+        return cast(str, self.get_value("mode"))
 
-    def turn_off(self):
-        """Set hvac mode to off"""
+    def turn_off(self) -> None:
+        """Set hvac mode to off."""
         self.set_hvac_mode("Off")
 
-    def turn_cool_on(self):
-        """Set hvac mode to cool"""
+    def turn_cool_on(self) -> None:
+        """Set hvac mode to cool."""
         self.set_hvac_mode("CoolOn")
 
-    def turn_heat_on(self):
-        """Set hvac mode to heat"""
+    def turn_heat_on(self) -> None:
+        """Set hvac mode to heat."""
         self.set_hvac_mode("HeatOn")
 
-    def turn_auto_on(self):
-        """Set hvac mode to auto"""
+    def turn_auto_on(self) -> None:
+        """Set hvac mode to auto."""
         self.set_hvac_mode("AutoChangeOver")
 
-    def set_fan_mode(self, mode):
-        """Set the fan mode"""
+    def set_fan_mode(self, mode: str) -> None:
+        """Set the fan mode."""
         self.set_service_value(self.thermostat_fan_service, "Mode", "NewMode", mode)
         self.set_cache_value("fanmode", mode)
 
-    def fan_on(self):
-        """Turn fan on"""
+    def fan_on(self) -> None:
+        """Turn fan on."""
         self.set_fan_mode("ContinuousOn")
 
-    def fan_off(self):
-        """Turn fan off"""
+    def fan_off(self) -> None:
+        """Turn fan off."""
         self.set_fan_mode("Off")
 
-    def get_fan_mode(self, refresh=False):
-        """Get fan mode"""
+    def get_fan_mode(self, refresh: bool = False) -> Optional[str]:
+        """Get fan mode."""
         if refresh:
             self.refresh()
-        return self.get_value("fanmode")
+        return cast(str, self.get_value("fanmode"))
 
-    def get_hvac_state(self, refresh=False):
-        """Get current hvac state"""
+    def get_hvac_state(self, refresh: bool = False) -> Optional[str]:
+        """Get current hvac state."""
         if refresh:
             self.refresh()
-        return self.get_value("hvacstate")
+        return cast(str, self.get_value("hvacstate"))
 
-    def fan_auto(self):
-        """Set fan to automatic"""
+    def fan_auto(self) -> None:
+        """Set fan to automatic."""
         self.set_fan_mode("Auto")
 
-    def fan_cycle(self):
-        """Set fan to cycle"""
+    def fan_cycle(self) -> None:
+        """Set fan to cycle."""
         self.set_fan_mode("PeriodicOn")
 
 
 class VeraSceneController(VeraDevice):
     """Class to represent a scene controller."""
 
-    def get_last_scene_id(self, refresh=False):
+    def get_last_scene_id(self, refresh: bool = False) -> str:
         """Get last scene id.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
@@ -1289,9 +1327,9 @@ class VeraSceneController(VeraDevice):
         val = self.get_complex_value("LastSceneID") or self.get_complex_value(
             "sl_CentralScene"
         )
-        return val
+        return cast(str, val)
 
-    def get_last_scene_time(self, refresh=False):
+    def get_last_scene_time(self, refresh: bool = False) -> str:
         """Get last scene time.
 
         Refresh data from Vera if refresh is True, otherwise use local cache.
@@ -1300,10 +1338,11 @@ class VeraSceneController(VeraDevice):
         if refresh:
             self.refresh_complex_value("LastSceneTime")
         val = self.get_complex_value("LastSceneTime")
-        return val
+        return cast(str, val)
 
     @property
-    def should_poll(self):
+    def should_poll(self) -> bool:
+        """Determine if you should poll for data."""
         return True
 
 
@@ -1318,40 +1357,34 @@ class VeraScene:
     be refactored at some point to be reused.  Perhaps a VeraObject?
     """
 
-    def __init__(self, json_obj, vera_controller):
-        """Setup a Vera scene."""
+    def __init__(self, json_obj: dict, vera_controller: VeraController):
+        """Init object."""
         self.json_state = json_obj
-        self.scene_id = self.json_state.get("id")
+        self.scene_id = cast(int, self.json_state.get("id"))
         self.vera_controller = vera_controller
         self.name = self.json_state.get("name")
         self._active = False
 
         if not self.name:
-            self.name = "Vera Scene " + self.name + " " + str(self.scene_id)
+            self.name = f"Vera Scene {self.name} {self.scene_id}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Get a string representation."""
-        if sys.version_info >= (3, 0):
-            return "{} (id={} name={})".format(
-                self.__class__.__name__, self.scene_id, self.name
-            )
-        return "{} (id={} name={})".format(
-            self.__class__.__name__, self.scene_id, self.name
-        ).encode("utf-8")
+        return f"{self.__class__.__name__} (id={self.scene_id} name={self.name})"
 
     @property
-    def scene_service(self):
+    def scene_service(self) -> str:
         """Vera service string for switch."""
         return "urn:micasaverde-com:serviceId:HomeAutomationGateway1"
 
-    def vera_request(self, **kwargs):
+    def vera_request(self, **kwargs: str) -> requests.Response:
         """Perfom a vera_request for this scene."""
         request_payload = {"output_format": "json", "SceneNum": self.scene_id}
         request_payload.update(kwargs)
 
         return self.vera_controller.data_request(request_payload)
 
-    def activate(self):
+    def activate(self) -> None:
         """Activate a Vera scene.
 
         This will call the Vera api to activate a scene.
@@ -1370,11 +1403,11 @@ class VeraScene:
 
         self._active = True
 
-    def update(self, params):
+    def update(self, params: dict) -> None:
         """Update the local variables."""
         self._active = params["active"] == 1
 
-    def refresh(self):
+    def refresh(self) -> None:
         """Refresh the data used by get_value.
 
         Only needed if you're not using subscriptions.
@@ -1386,17 +1419,17 @@ class VeraScene:
                 self.update(scene_data)
 
     @property
-    def is_active(self):
+    def is_active(self) -> bool:
         """Is Scene active."""
         return self._active
 
     @property
-    def vera_scene_id(self):
-        """The ID Vera uses to refer to the scene."""
+    def vera_scene_id(self) -> int:
+        """Return the ID Vera uses to refer to the scene."""
         return self.scene_id
 
     @property
-    def should_poll(self):
+    def should_poll(self) -> bool:
         """Whether polling is needed if using subscriptions for this device."""
         return True
 
@@ -1406,22 +1439,238 @@ class VeraGarageDoor(VeraSwitch):
 
 
 class VeraAlert:
-    """An alert triggered by variable state change
-    """
+    """An alert triggered by variable state change."""
 
-    def __init__(self, json_alert, device):
+    def __init__(self, json_alert: dict, device: VeraDevice):
+        """Init object."""
         self.device = device
         self.code = json_alert.get("Code")
         self.severity = json_alert.get("Severity")
-        self.value = json_alert.get("NewValue")
+        self.value = cast(str, json_alert.get("NewValue"))
         self.timestamp = datetime.fromtimestamp(json_alert.get("LocalTimestamp", 0))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Get a string representation."""
-        if sys.version_info >= (3, 0):
-            return "{} (code={} value={} timestamp={})".format(
-                self.__class__.__name__, self.code, self.value, self.timestamp
-            )
-        return "{} (code={} value={} timestamp={})".format(
-            self.__class__.__name__, self.code, self.value, self.timestamp
-        ).encode("utf-8")
+        return f"{self.__class__.__name__} (code={self.code} value={self.value} timestamp={self.timestamp})"
+
+
+class PyveraError(Exception):
+    """Simple error."""
+
+
+class SubscriptionRegistry:
+    """Class for subscribing to wemo events."""
+
+    def __init__(self, controller: VeraController):
+        """Init subscription."""
+        self._devices: DefaultDict[int, List[VeraDevice]] = collections.defaultdict(
+            list
+        )
+        self._callbacks: DefaultDict[
+            VeraDevice, List[SubscriptionCallback]
+        ] = collections.defaultdict(list)
+        self._exiting = threading.Event()
+        self._poll_thread: threading.Thread
+        self._controller = controller
+
+    def register(self, device: VeraDevice, callback: SubscriptionCallback) -> None:
+        """Register a callback.
+
+        device: device to be updated by subscription
+        callback: callback for notification of changes
+        """
+        if not device:
+            LOG.error("Received an invalid device: %r", device)
+            return
+
+        LOG.debug("Subscribing to events for %s", device.name)
+        self._devices[device.vera_device_id].append(device)
+        self._callbacks[device].append(callback)
+
+    def unregister(self, device: VeraDevice, callback: SubscriptionCallback) -> None:
+        """Remove a registered change callback.
+
+        device: device that has the subscription
+        callback: callback used in original registration
+        """
+        if not device:
+            LOG.error("Received an invalid device: %r", device)
+            return
+
+        LOG.debug("Removing subscription for %s", device.name)
+        self._callbacks[device].remove(callback)
+        self._devices[device.vera_device_id].remove(device)
+
+    def _event(
+        self, device_data_list: List[dict], device_alert_list: List[dict]
+    ) -> None:
+        # Guard against invalid data from Vera API
+        if not isinstance(device_data_list, list):
+            LOG.debug("Got invalid device_data_list: %s", device_data_list)
+            device_data_list = []
+
+        if not isinstance(device_alert_list, list):
+            LOG.debug("Got invalid device_alert_list: %s", device_alert_list)
+            device_alert_list = []
+
+        # Find unique device_ids that have data across both device_data and alert_data
+        device_ids = set()
+
+        for device_data in device_data_list:
+            if "id" in device_data:
+                device_ids.add(device_data["id"])
+            else:
+                LOG.debug("Got invalid device_data: %s", device_data)
+
+        for alert_data in device_alert_list:
+            if "PK_Device" in alert_data:
+                device_ids.add(alert_data["PK_Device"])
+            else:
+                LOG.debug("Got invalid alert_data: %s", alert_data)
+
+        for device_id in device_ids:
+            try:
+                device_list = self._devices.get(int(device_id), ())
+                device_datas = [
+                    data for data in device_data_list if data.get("id") == device_id
+                ]
+                device_alerts = [
+                    alert
+                    for alert in device_alert_list
+                    if alert.get("PK_Device") == device_id
+                ]
+
+                device_data = device_datas[0] if device_datas else {}
+
+                for device in device_list:
+                    self._event_device(device, device_data, device_alerts)
+            # pylint: disable=broad-except
+            except Exception as exp:
+                LOG.exception(
+                    "Error processing event for device_id %s: %s", device_id, exp
+                )
+
+    def _event_device(
+        self, device: Optional[VeraDevice], device_data: dict, device_alerts: List[dict]
+    ) -> None:
+        if device is None:
+            return
+        # Vera can send an update status STATE_NO_JOB but
+        # with a comment about sending a command
+        state = int(device_data.get("state", STATE_NOT_PRESENT))
+        comment = device_data.get("comment", "")
+        sending = comment.find("Sending") >= 0
+        LOG.debug(
+            "Event: %s, state %s, alerts %s, %s",
+            device.name,
+            state,
+            len(device_alerts),
+            json.dumps(device_data),
+        )
+        device.set_alerts(device_alerts)
+        if sending and state == STATE_NO_JOB:
+            state = STATE_JOB_WAITING_TO_START
+        if state == STATE_JOB_IN_PROGRESS and device.__class__.__name__ == "VeraLock":
+            # VeraLocks don't complete
+            # so we detect if we are done from the comment field.
+            # This is really just a workaround for a vera bug
+            # and it does mean that a device name
+            # cannot contain the SUCCESS! string (very unlikely)
+            # since the name is also returned in the comment for
+            # some status messages
+            success = comment.find("SUCCESS!") >= 0
+            if success:
+                LOG.debug("Lock success found, job is done")
+                state = STATE_JOB_DONE
+
+        if state in (
+            STATE_JOB_WAITING_TO_START,
+            STATE_JOB_IN_PROGRESS,
+            STATE_JOB_WAITING_FOR_CALLBACK,
+            STATE_JOB_REQUEUE,
+            STATE_JOB_PENDING_DATA,
+        ):
+            return
+        if not (
+            state == STATE_JOB_DONE
+            or state == STATE_NOT_PRESENT
+            or state == STATE_NO_JOB
+            or (state == STATE_JOB_ERROR and comment.find("Setting user configuration"))
+        ):
+            LOG.error("Device %s, state %s, %s", device.name, state, comment)
+            return
+        device.update(device_data)
+        for callback in self._callbacks.get(device, ()):
+            try:
+                callback(device)
+            # pylint: disable=broad-except
+            except Exception:
+                # (Very) broad check to not let loosely-implemented callbacks
+                # kill our polling thread. They should be catching their own
+                # errors, so if it gets back to us, just log it and move on.
+                LOG.exception(
+                    "Unhandled exception in callback for device #%s (%s)",
+                    str(device.device_id),
+                    device.name,
+                )
+
+    def join(self) -> None:
+        """Don't allow the main thread to terminate until we have."""
+        self._poll_thread.join()
+
+    def start(self) -> None:
+        """Start a thread to handle Vera blocked polling."""
+        self._poll_thread = threading.Thread(
+            target=self._run_poll_server, name="Vera Poll Thread"
+        )
+        self._exiting = threading.Event()
+        self._poll_thread.daemon = True
+        self._poll_thread.start()
+
+    def stop(self) -> None:
+        """Tell the subscription thread to terminate."""
+        if self._exiting:
+            self._exiting.set()
+        self.join()
+        LOG.info("Terminated thread")
+
+    def _run_poll_server(self) -> None:
+        controller = self._controller
+        timestamp = TIMESTAMP_NONE
+        device_data: List[dict] = []
+        alert_data: List[dict] = []
+        data_changed = False
+        while not self._exiting.wait(timeout=1):
+            try:
+                LOG.debug("Polling for Vera changes")
+                device_data, new_timestamp = controller.get_changed_devices(timestamp)
+                if new_timestamp["dataversion"] != timestamp["dataversion"]:
+                    alert_data = controller.get_alerts(timestamp)
+                    data_changed = True
+                else:
+                    data_changed = False
+                timestamp = new_timestamp
+            except requests.RequestException as ex:
+                LOG.debug("Caught RequestException: %s", str(ex))
+            except PyveraError as ex:
+                LOG.debug("Non-fatal error in poll: %s", str(ex))
+            except Exception as ex:
+                LOG.exception("Vera poll thread general exception: %s", str(ex))
+                raise
+            else:
+                LOG.debug("Poll returned")
+                if not self._exiting.is_set():
+                    if data_changed:
+                        self._event(device_data, alert_data)
+                    else:
+                        LOG.debug("No changes in poll interval")
+
+                continue
+
+            # After error, discard timestamp for fresh update. pyvera issue #89
+            timestamp = {"dataversion": 1, "loadtime": 0}
+            LOG.info("Could not poll Vera - will retry in %ss", SUBSCRIPTION_RETRY)
+
+            self._exiting.wait(timeout=SUBSCRIPTION_RETRY)
+
+        LOG.info("Shutdown Vera Poll Thread")

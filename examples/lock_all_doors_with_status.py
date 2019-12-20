@@ -7,23 +7,25 @@ import argparse
 import os
 import sys
 import time
+from typing import cast
 
 # Import pyvera
-from pyvera import VeraController, VeraLock
+from pyvera import VeraController, VeraDevice, VeraLock
 
 
 # Define a callback that runs each time a device changes state
-def device_info_callback(vera_device):
+def device_info_callback(vera_device: VeraDevice) -> None:
     """Print device info."""
+    device = cast(VeraLock, vera_device)
     # Do what we want with the changed device information
     print(
         "{}_{}: locked={}".format(
-            vera_device.name, vera_device.device_id, vera_device.is_locked()
+            vera_device.name, vera_device.device_id, device.is_locked()
         )
     )
 
 
-def main():
+def main() -> None:
     """Run main code entrypoint."""
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 

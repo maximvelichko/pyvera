@@ -7,7 +7,12 @@ from unittest.mock import MagicMock
 import pytest
 import pyvera
 from pyvera import (
+    CATEGORY_LOCK,
+    STATE_JOB_IN_PROGRESS,
+    STATE_NO_JOB,
+    SubscriptionRegistry,
     VeraBinarySensor,
+    VeraController,
     VeraCurtain,
     VeraDimmer,
     VeraLock,
@@ -55,12 +60,60 @@ def test_controller_refresh_data(vera_controller_data: VeraControllerData) -> No
     assert controller.serial_number == "fake_serial_number"
 
 
+# pylint: disable=protected-access
+def test__event_device_for_vera_lock_status() -> None:
+    """Test function."""
+    registry = SubscriptionRegistry(MagicMock(spec=VeraController))
+    mock_lock = MagicMock(spec=VeraLock)
+    mock_lock.name = MagicMock(return_value="MyTestDeadbolt")
+
+    # Deadbolt changing but not done
+    device_json: dict = {"state": STATE_JOB_IN_PROGRESS}
+    registry._event_device(mock_lock, device_json, [])
+    mock_lock.update.assert_not_called()
+
+    # Deadbolt progress with reset state but not done
+    device_json = {
+        "state": STATE_NO_JOB,
+        "comment": "MyTestDeadbolt: Sending the Z-Wave command after 0 retries",
+    }
+    registry._event_device(mock_lock, device_json, [])
+    mock_lock.update.assert_not_called()
+
+    # Deadbolt progress locked but not done
+    device_json = {
+        "state": STATE_JOB_IN_PROGRESS,
+        "locked": "1",
+        "comment": "MyTestDeadbolt",
+    }
+    registry._event_device(mock_lock, device_json, [])
+    mock_lock.update.assert_not_called()
+
+    # Deadbolt progress with status but not done
+    device_json = {
+        "state": STATE_JOB_IN_PROGRESS,
+        "comment": "MyTestDeadbolt: Please wait! Polling node",
+    }
+    registry._event_device(mock_lock, device_json, [])
+    mock_lock.update.assert_not_called()
+
+    # Deadbolt progress complete
+    device_json = {
+        "state": STATE_JOB_IN_PROGRESS,
+        "locked": "1",
+        "comment": "MyTestDeadbolt: SUCCESS! Successfully polled node",
+        "deviceInfo": {"category": CATEGORY_LOCK},
+    }
+    registry._event_device(mock_lock, device_json, [])
+    mock_lock.update.assert_called_once_with(device_json)
+
+
 def test_polling(vera_controller_data: VeraControllerData) -> None:
     """Test function."""
     controller = vera_controller_data.controller
 
     callback_mock = MagicMock()
-    device = cast(pyvera.VeraSensor, controller.get_device_by_id(DEVICE_TEMP_SENSOR_ID))
+    device = cast(VeraSensor, controller.get_device_by_id(DEVICE_TEMP_SENSOR_ID))
     controller.register(device, callback_mock)
 
     # Data updated, poll didn't run yet.
@@ -68,15 +121,15 @@ def test_polling(vera_controller_data: VeraControllerData) -> None:
         controller_data=vera_controller_data,
         device_id=DEVICE_TEMP_SENSOR_ID,
         key="temperature",
-        value="66.00",
+        value=66.00,
         push=False,
     )
-    assert device.temperature == "57.00"
+    assert device.temperature == 57.00
     callback_mock.assert_not_called()
 
     # Poll ran, new data, device updated.
     time.sleep(1.1)
-    assert device.temperature == "66.00"
+    assert device.temperature == 66.00
     callback_mock.assert_called_with(device)
     callback_mock.reset_mock()
 
@@ -89,7 +142,7 @@ def test_polling(vera_controller_data: VeraControllerData) -> None:
         controller_data=vera_controller_data,
         device_id=DEVICE_TEMP_SENSOR_ID,
         key="temperature",
-        value="77.00",
+        value=77.00,
         push=False,
     )
     callback_mock.assert_not_called()
@@ -98,23 +151,23 @@ def test_polling(vera_controller_data: VeraControllerData) -> None:
 
 
 def test_controller_register_unregister(
-    vera_controller_data: VeraControllerData
+    vera_controller_data: VeraControllerData,
 ) -> None:
     """Test function."""
     controller = vera_controller_data.controller
     device = cast(VeraSensor, controller.get_device_by_id(DEVICE_TEMP_SENSOR_ID))
     callback_mock = MagicMock()
 
-    assert device.temperature == "57.00"
+    assert device.temperature == 57.00
 
     # Device not registered, device is not update.
     update_device(
         controller_data=vera_controller_data,
         device_id=DEVICE_TEMP_SENSOR_ID,
         key="temperature",
-        value="66.00",
+        value=66.00,
     )
-    assert device.temperature == "57.00"
+    assert device.temperature == 57.00
     callback_mock.assert_not_called()
     callback_mock.mock_reset()
 
@@ -124,9 +177,9 @@ def test_controller_register_unregister(
         controller_data=vera_controller_data,
         device_id=DEVICE_TEMP_SENSOR_ID,
         key="temperature",
-        value="66.00",
+        value=66.00,
     )
-    assert device.temperature == "66.00"
+    assert device.temperature == 66.00
     callback_mock.assert_called_with(device)
     callback_mock.reset_mock()
 
@@ -136,9 +189,9 @@ def test_controller_register_unregister(
         controller_data=vera_controller_data,
         device_id=DEVICE_TEMP_SENSOR_ID,
         key="temperature",
-        value="111111.00",
+        value=111111.11,
     )
-    assert device.temperature == "66.00"
+    assert device.temperature == 66.00
     callback_mock.assert_not_called()
 
 
@@ -282,7 +335,7 @@ def test_scene_controller(vera_controller_data: VeraControllerData) -> None:
     device = cast(
         VeraSceneController, controller.get_device_by_id(DEVICE_SCENE_CONTROLLER_ID)
     )
-    controller.register(device, lambda: None)
+    controller.register(device, lambda device: None)
 
     assert device.get_last_scene_id(refresh=True) == "1234"
     assert device.get_last_scene_time(refresh=True) == "10000012"
@@ -319,10 +372,10 @@ SensorParam = NamedTuple(
         SensorParam(
             device_id=DEVICE_TEMP_SENSOR_ID,
             device_property="temperature",
-            initial_value="57.00",
-            new_value="66.00",
+            initial_value=57.00,
+            new_value=66.00,
             variable="temperature",
-            variable_value="66.00",
+            variable_value=66.00,
         ),
         SensorParam(
             device_id=DEVICE_ALARM_SENSOR_ID,

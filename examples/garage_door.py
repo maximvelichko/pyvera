@@ -11,7 +11,7 @@ import sys
 from pyvera import VeraController, VeraGarageDoor
 
 
-def main():
+def main() -> None:
     """Run main code entrypoint."""
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 
