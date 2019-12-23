@@ -1,6 +1,6 @@
 VENV_DIR=".venv"
 PYTHON_BIN="python3"
-LINT_PATHS="./vera ./tests/ ./examples/"
+LINT_PATHS="./pyvera ./tests/ ./examples/"
 
 function assertPython() {
   if ! [[ $(which "$PYTHON_BIN") ]]; then

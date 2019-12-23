@@ -11,3 +11,4 @@ build
 .idea
 .mypy_cache
 .pytest_cache
+coverage.xml
