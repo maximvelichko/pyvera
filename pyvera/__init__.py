@@ -2,6 +2,7 @@
 
 This lib is designed to simplify communication with Vera controllers
 """
+from abc import ABC, abstractmethod
 import collections
 from datetime import datetime
 import json
@@ -10,7 +11,18 @@ import os
 import shlex
 import threading
 import time
-from typing import Any, Callable, DefaultDict, Dict, List, Optional, Tuple, Union, cast
+from typing import (
+    Any,
+    Callable,
+    DefaultDict,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+    cast,
+)
 
 import requests
 
@@ -91,11 +103,21 @@ class VeraController:
 
     temperature_units = "C"
 
-    def __init__(self, base_url: str):
+    def __init__(
+        self,
+        base_url: str,
+        subscription_registry_class: Optional[
+            Type["AbstractSubscriptionRegistry"]
+        ] = None,
+    ):
         """Init Vera controller at the given URL.
 
         base_url: Vera API URL, eg http://vera:3480.
         """
+        subscription_registry_class = (
+            subscription_registry_class or SubscriptionRegistry
+        )
+
         self.base_url = base_url
         self.devices: List[VeraDevice] = []
         self.scenes: List[VeraScene] = []
@@ -104,7 +126,7 @@ class VeraController:
         self.model = None
         self.serial_number = None
         self.device_services_map: Dict[int, List[dict]] = {}
-        self.subscription_registry = SubscriptionRegistry(self)
+        self.subscription_registry = subscription_registry_class(self)
         self.categories: Dict[int, str] = {}
         self.device_id_map: Dict[int, VeraDevice] = {}
 
@@ -1458,7 +1480,7 @@ class PyveraError(Exception):
     """Simple error."""
 
 
-class SubscriptionRegistry:
+class AbstractSubscriptionRegistry(ABC):
     """Class for subscribing to wemo events."""
 
     def __init__(self, controller: VeraController):
@@ -1469,9 +1491,8 @@ class SubscriptionRegistry:
         self._callbacks: DefaultDict[
             VeraDevice, List[SubscriptionCallback]
         ] = collections.defaultdict(list)
-        self._exiting = threading.Event()
-        self._poll_thread: threading.Thread
         self._controller = controller
+        self._last_updated = TIMESTAMP_NONE
 
     def register(self, device: VeraDevice, callback: SubscriptionCallback) -> None:
         """Register a callback.
@@ -1614,6 +1635,67 @@ class SubscriptionRegistry:
                     device.name,
                 )
 
+    @abstractmethod
+    def start(self) -> None:
+        """Start a thread to handle Vera blocked polling."""
+        raise NotImplementedError("start method is not implemented.")
+
+    @abstractmethod
+    def stop(self) -> None:
+        """Tell the subscription thread to terminate."""
+        raise NotImplementedError("stop method is not implemented.")
+
+    def poll_server_once(self) -> bool:
+        """Poll the vera server only once.
+
+        Returns True if it could successfully check for data. False otherwise.
+        """
+        controller = self._controller
+        device_data: List[dict] = []
+        alert_data: List[dict] = []
+        data_changed = False
+        try:
+            LOG.debug("Polling for Vera changes")
+            device_data, new_timestamp = controller.get_changed_devices(
+                self._last_updated
+            )
+            if new_timestamp["dataversion"] != self._last_updated["dataversion"]:
+                alert_data = controller.get_alerts(self._last_updated)
+                data_changed = True
+            else:
+                data_changed = False
+            self._last_updated = new_timestamp
+        except requests.RequestException as ex:
+            LOG.debug("Caught RequestException: %s", str(ex))
+        except PyveraError as ex:
+            LOG.debug("Non-fatal error in poll: %s", str(ex))
+        except Exception as ex:
+            LOG.exception("Vera poll thread general exception: %s", str(ex))
+            raise
+        else:
+            LOG.debug("Poll returned")
+            if data_changed:
+                self._event(device_data, alert_data)
+            else:
+                LOG.debug("No changes in poll interval")
+
+            return True
+
+        # After error, discard timestamp for fresh update. pyvera issue #89
+        self._last_updated = {"dataversion": 1, "loadtime": 0}
+        LOG.info("Could not poll Vera")
+        return False
+
+
+class SubscriptionRegistry(AbstractSubscriptionRegistry):
+    """Class for subscribing to wemo events."""
+
+    def __init__(self, controller: VeraController):
+        """Init subscription."""
+        super(SubscriptionRegistry, self).__init__(controller)
+        self._exiting = threading.Event()
+        self._poll_thread: threading.Thread
+
     def join(self) -> None:
         """Don't allow the main thread to terminate until we have."""
         self._poll_thread.join()
@@ -1635,42 +1717,8 @@ class SubscriptionRegistry:
         LOG.info("Terminated thread")
 
     def _run_poll_server(self) -> None:
-        controller = self._controller
-        timestamp = TIMESTAMP_NONE
-        device_data: List[dict] = []
-        alert_data: List[dict] = []
-        data_changed = False
         while not self._exiting.wait(timeout=1):
-            try:
-                LOG.debug("Polling for Vera changes")
-                device_data, new_timestamp = controller.get_changed_devices(timestamp)
-                if new_timestamp["dataversion"] != timestamp["dataversion"]:
-                    alert_data = controller.get_alerts(timestamp)
-                    data_changed = True
-                else:
-                    data_changed = False
-                timestamp = new_timestamp
-            except requests.RequestException as ex:
-                LOG.debug("Caught RequestException: %s", str(ex))
-            except PyveraError as ex:
-                LOG.debug("Non-fatal error in poll: %s", str(ex))
-            except Exception as ex:
-                LOG.exception("Vera poll thread general exception: %s", str(ex))
-                raise
-            else:
-                LOG.debug("Poll returned")
-                if not self._exiting.is_set():
-                    if data_changed:
-                        self._event(device_data, alert_data)
-                    else:
-                        LOG.debug("No changes in poll interval")
-
-                continue
-
-            # After error, discard timestamp for fresh update. pyvera issue #89
-            timestamp = {"dataversion": 1, "loadtime": 0}
-            LOG.info("Could not poll Vera - will retry in %ss", SUBSCRIPTION_RETRY)
-
-            self._exiting.wait(timeout=SUBSCRIPTION_RETRY)
+            if not self.poll_server_once():
+                self._exiting.wait(timeout=SUBSCRIPTION_RETRY)
 
         LOG.info("Shutdown Vera Poll Thread")
