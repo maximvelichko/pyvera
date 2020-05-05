@@ -11,18 +11,7 @@ import os
 import shlex
 import threading
 import time
-from typing import (
-    Any,
-    Callable,
-    DefaultDict,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    Type,
-    Union,
-    cast,
-)
+from typing import Any, Callable, DefaultDict, Dict, List, Optional, Tuple, Union, cast
 
 import requests
 
@@ -106,17 +95,12 @@ class VeraController:
     def __init__(
         self,
         base_url: str,
-        subscription_registry_class: Optional[
-            Type["AbstractSubscriptionRegistry"]
-        ] = None,
+        subscription_registry: Optional["AbstractSubscriptionRegistry"] = None,
     ):
         """Init Vera controller at the given URL.
 
         base_url: Vera API URL, eg http://vera:3480.
         """
-        subscription_registry_class = (
-            subscription_registry_class or SubscriptionRegistry
-        )
 
         self.base_url = base_url
         self.devices: List[VeraDevice] = []
@@ -126,7 +110,8 @@ class VeraController:
         self.model = None
         self.serial_number = None
         self.device_services_map: Dict[int, List[dict]] = {}
-        self.subscription_registry = subscription_registry_class(self)
+        self.subscription_registry = subscription_registry or SubscriptionRegistry()
+        self.subscription_registry.set_controller(self)
         self.categories: Dict[int, str] = {}
         self.device_id_map: Dict[int, VeraDevice] = {}
 
@@ -1480,10 +1465,14 @@ class PyveraError(Exception):
     """Simple error."""
 
 
+class ControllerNotSetException(Exception):
+    """The controller was not set in the subscription registry."""
+
+
 class AbstractSubscriptionRegistry(ABC):
     """Class for subscribing to wemo events."""
 
-    def __init__(self, controller: VeraController):
+    def __init__(self) -> None:
         """Init subscription."""
         self._devices: DefaultDict[int, List[VeraDevice]] = collections.defaultdict(
             list
@@ -1491,8 +1480,16 @@ class AbstractSubscriptionRegistry(ABC):
         self._callbacks: DefaultDict[
             VeraDevice, List[SubscriptionCallback]
         ] = collections.defaultdict(list)
-        self._controller = controller
         self._last_updated = TIMESTAMP_NONE
+        self._controller: Optional[VeraController] = None
+
+    def set_controller(self, controller: VeraController) -> None:
+        """Set the controller."""
+        self._controller = controller
+
+    def get_controller(self) -> Optional[VeraController]:
+        """Get the controller."""
+        return self._controller
 
     def register(self, device: VeraDevice, callback: SubscriptionCallback) -> None:
         """Register a callback.
@@ -1645,22 +1642,40 @@ class AbstractSubscriptionRegistry(ABC):
         """Tell the subscription thread to terminate."""
         raise NotImplementedError("stop method is not implemented.")
 
+    def get_device_data(self, last_updated: dict) -> ChangedDevicesValue:
+        """Get device data."""
+        if not self._controller:
+            raise ControllerNotSetException()
+
+        return self._controller.get_changed_devices(last_updated)
+
+    def get_alert_data(self, last_updated: dict) -> List[dict]:
+        """Get alert data."""
+        if not self._controller:
+            raise ControllerNotSetException()
+
+        return self._controller.get_alerts(last_updated)
+
+    def always_update(self) -> bool:  # pylint: disable=no-self-use
+        """Determine if we should treat every poll as a data change."""
+        return False
+
     def poll_server_once(self) -> bool:
         """Poll the vera server only once.
 
         Returns True if it could successfully check for data. False otherwise.
         """
-        controller = self._controller
         device_data: List[dict] = []
         alert_data: List[dict] = []
         data_changed = False
         try:
             LOG.debug("Polling for Vera changes")
-            device_data, new_timestamp = controller.get_changed_devices(
-                self._last_updated
-            )
-            if new_timestamp["dataversion"] != self._last_updated["dataversion"]:
-                alert_data = controller.get_alerts(self._last_updated)
+            device_data, new_timestamp = self.get_device_data(self._last_updated)
+            if (
+                new_timestamp["dataversion"] != self._last_updated["dataversion"]
+                or self.always_update()
+            ):
+                alert_data = self.get_alert_data(self._last_updated)
                 data_changed = True
             else:
                 data_changed = False
@@ -1674,7 +1689,7 @@ class AbstractSubscriptionRegistry(ABC):
             raise
         else:
             LOG.debug("Poll returned")
-            if data_changed:
+            if data_changed or self.always_update():
                 self._event(device_data, alert_data)
             else:
                 LOG.debug("No changes in poll interval")
@@ -1690,9 +1705,9 @@ class AbstractSubscriptionRegistry(ABC):
 class SubscriptionRegistry(AbstractSubscriptionRegistry):
     """Class for subscribing to wemo events."""
 
-    def __init__(self, controller: VeraController):
+    def __init__(self) -> None:
         """Init subscription."""
-        super(SubscriptionRegistry, self).__init__(controller)
+        super(SubscriptionRegistry, self).__init__()
         self._exiting = threading.Event()
         self._poll_thread: threading.Thread
 

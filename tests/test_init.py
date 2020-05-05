@@ -63,7 +63,8 @@ def test_controller_refresh_data(vera_controller_data: VeraControllerData) -> No
 # pylint: disable=protected-access
 def test__event_device_for_vera_lock_status() -> None:
     """Test function."""
-    registry = SubscriptionRegistry(MagicMock(spec=VeraController))
+    registry = SubscriptionRegistry()
+    registry.set_controller(MagicMock(spec=VeraController))
     mock_lock = MagicMock(spec=VeraLock)
     mock_lock.name = MagicMock(return_value="MyTestDeadbolt")
 
@@ -156,22 +157,14 @@ def test_controller_custom_subscription_registry() -> None:
     class CustomSubscriptionRegistry(pyvera.AbstractSubscriptionRegistry):
         """Test registry."""
 
-        def __init__(self, controller: VeraController) -> None:
-            """Init the object."""
-            super(CustomSubscriptionRegistry, self).__init__(controller)
-            self.my_controller = controller
-
         def start(self) -> None:
             """Start the polling."""
 
         def stop(self) -> None:
             """Stop the polling."""
 
-    controller = VeraController("URL", CustomSubscriptionRegistry)
-    subscription_registry = cast(
-        CustomSubscriptionRegistry, controller.subscription_registry
-    )
-    assert subscription_registry.my_controller == controller
+    controller = VeraController("URL", CustomSubscriptionRegistry())
+    assert controller.subscription_registry.get_controller() == controller
 
 
 def test_controller_register_unregister(
