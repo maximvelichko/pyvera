@@ -150,6 +150,30 @@ def test_polling(vera_controller_data: VeraControllerData) -> None:
     callback_mock.assert_called_with(device)
 
 
+def test_controller_custom_subscription_registry() -> None:
+    """Test function."""
+
+    class CustomSubscriptionRegistry(pyvera.AbstractSubscriptionRegistry):
+        """Test registry."""
+
+        def __init__(self, controller: VeraController) -> None:
+            """Init the object."""
+            super(CustomSubscriptionRegistry, self).__init__(controller)
+            self.my_controller = controller
+
+        def start(self) -> None:
+            """Start the polling."""
+
+        def stop(self) -> None:
+            """Stop the polling."""
+
+    controller = VeraController("URL", CustomSubscriptionRegistry)
+    subscription_registry = cast(
+        CustomSubscriptionRegistry, controller.subscription_registry
+    )
+    assert subscription_registry.my_controller == controller
+
+
 def test_controller_register_unregister(
     vera_controller_data: VeraControllerData,
 ) -> None:
