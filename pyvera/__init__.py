@@ -210,7 +210,7 @@ class VeraController:
         alerts = json_data.get("alerts", ())
 
         for item in items:
-            item["deviceInfo"] = self.device_id_map.get(item.get("id"))
+            item["deviceInfo"] = self.device_id_map.get(item.get("id")) or {}
             item_alerts = [
                 alert for alert in alerts if alert.get("PK_Device") == item.get("id")
             ]
