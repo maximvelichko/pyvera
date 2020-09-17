@@ -118,7 +118,9 @@ class VeraController:
     def data_request(self, payload: dict, timeout: int = TIMEOUT) -> requests.Response:
         """Perform a data_request and return the result."""
         request_url = self.base_url + "/data_request"
-        return requests.get(request_url, timeout=timeout, params=payload)
+        response = requests.get(request_url, timeout=timeout, params=payload)
+        response.encoding = "utf-8"
+        return response
 
     def get_simple_devices_info(self) -> None:
         """Get basic device info from Vera."""
