@@ -119,7 +119,7 @@ class VeraController:
         """Perform a data_request and return the result."""
         request_url = self.base_url + "/data_request"
         response = requests.get(request_url, timeout=timeout, params=payload)
-        response.encoding = "utf-8"
+        response.encoding = response.encoding if response.encoding else "utf-8"
         return response
 
     def get_simple_devices_info(self) -> None:
