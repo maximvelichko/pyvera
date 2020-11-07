@@ -334,16 +334,19 @@ def test_dimmer(vera_controller_data: VeraControllerData) -> None:
 
     device.switch_on()
     assert device.is_switched_on() is True
-    assert device.get_brightness() == 255
 
     device.set_brightness(66)
+    assert device.get_brightness() == 66
+
+    device.switch_off()
+    device.switch_on()
     assert device.get_brightness() == 66
 
     device.set_color([120, 130, 140])
     assert device.get_color() == [120, 130, 140]
 
     device.switch_off()
-    assert device.get_brightness() == 0
+    assert device.is_switched_on() is False
 
 
 def test_scene_controller(vera_controller_data: VeraControllerData) -> None:

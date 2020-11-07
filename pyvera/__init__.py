@@ -816,25 +816,6 @@ class VeraSwitch(VeraDevice):
 class VeraDimmer(VeraSwitch):
     """Class to add dimmer functionality."""
 
-    def switch_on(self) -> None:
-        """Turn the dimmer on."""
-        self.set_brightness(254)
-
-    def switch_off(self) -> None:
-        """Turn the dimmer off."""
-        self.set_brightness(0)
-
-    def is_switched_on(self, refresh: bool = False) -> bool:
-        """Get dimmer state.
-
-        Refresh data from Vera if refresh is True,
-        otherwise use local cache. Refresh is only needed if you're
-        not using subscriptions.
-        """
-        if refresh:
-            self.refresh()
-        return self.get_brightness(refresh) > 0
-
     def get_brightness(self, refresh: bool = False) -> int:
         """Get dimmer brightness.
 
