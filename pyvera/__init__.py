@@ -816,7 +816,7 @@ class VeraSwitch(VeraDevice):
 class VeraDimmer(VeraSwitch):
     """Class to add dimmer functionality."""
 
-    def is_switched_on(self, refresh=False):
+    def def is_switched_on(self, refresh: bool = False) -> bool:
         """Get dimmer state.
 
         Refresh data from Vera if refresh is True,
