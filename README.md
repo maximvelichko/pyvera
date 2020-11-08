@@ -36,17 +36,17 @@ There is some example code (that can also help with tracing and debugging) in th
 
 This will list your vera devices
 ~~~~
-$ ./examples/list-devices.py -u http://192.168.1.161:3480
+$ ./examples/list_devices.py -u http://192.168.1.161:3480
 ~~~~
 
 This will show you events on a particular device (get the id from the example above)
 ~~~~
-$ ./examples/device-listener.py -u http://192.168.1.161:3480/  -i 26
+$ ./examples/device_listener.py -u http://192.168.1.161:3480/  -i 26
 ~~~~
 
 If you have locks - this will show you information about them.
 ~~~~
-$ ./examples/show-lock-info.py -u http://192.168.1.161:3480/
+$ ./examples/show_lock_info.py -u http://192.168.1.161:3480/
 ~~~~
 
 Debugging
