@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyvera"
-version = "0.3.10"
+version = "0.3.11"
 description = "Python API for talking to Veracontrollers"
 
 license = "GPL2"
@@ -18,7 +18,7 @@ homepage = "https://github.com/pavoni/pyvera"
 keywords = ['vera', 'api']
 
 [tool.poetry.dependencies]
-python = "^3.5 || ^3.6 || ^3.7"
+python = "^3.5 || ^3.6 || ^3.7 || ^3.8"
 requests = ">=2.22.0"
 
 [tool.poetry.dev-dependencies]
