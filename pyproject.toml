@@ -17,6 +17,10 @@ homepage = "https://github.com/pavoni/pyvera"
 
 keywords = ['vera', 'api']
 
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.poetry.dependencies]
 python = "^3.5 || ^3.6 || ^3.7 || ^3.8"
 requests = ">=2.22.0"
