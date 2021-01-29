@@ -1,4 +1,5 @@
-# PyVera
+pyvera |Build Badge| |PyPI Version Badge| |PyPI Downloads Badge|
+================================================================
 A simple Python library to control devices via the Vera controller (http://getvera.com/).
 
 Based on https://github.com/jamespcole/home-assistant-vera-api
