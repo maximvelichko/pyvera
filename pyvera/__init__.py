@@ -772,7 +772,10 @@ class VeraDevice:
     @property
     def comm_failure(self) -> bool:
         """Return the Communication Failure Flag."""
-        return cast(str, self.get_strict_value("commFailure")) != "0"
+        status = self.get_strict_value("commFailure")
+        if status is None:
+            return False
+        return cast(str, status) != "0"
 
     @property
     def vera_device_id(self) -> int:
