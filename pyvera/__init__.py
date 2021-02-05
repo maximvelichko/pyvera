@@ -670,7 +670,7 @@ class VeraDevice:
         """Get any alerts present during the most recent poll cycle."""
         return self.alerts
 
-    def refresh(self, poll_on_failure: bool = False) -> None:
+    def refresh(self) -> None:
         """Refresh the dev_info data used by get_value.
 
         Only needed if you're not using subscriptions.
@@ -680,9 +680,6 @@ class VeraDevice:
         for device_data in devices:
             if device_data.get("id") == self.device_id:
                 self.update(device_data)
-
-        if poll_on_failure and self.comm_failure:
-            self.poll_device()
 
     def update(self, params: dict) -> None:
         """Update the dev_info data from a dictionary.
