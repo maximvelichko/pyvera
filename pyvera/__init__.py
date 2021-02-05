@@ -529,6 +529,11 @@ class VeraDevice:
         """Vera service string for color."""
         return "urn:micasaverde-com:serviceId:Color1"
 
+    @property
+    def poll_service(self) -> str:
+        """Vera service string for poll."""
+        return "urn:micasaverde-com:serviceId:HaDevice1"
+
     def vera_request(self, **kwargs: Any) -> requests.Response:
         """Perfom a vera_request for this device."""
         request_payload = {"output_format": "json", "DeviceNum": self.device_id}
@@ -567,11 +572,16 @@ class VeraDevice:
         """
         result = self.vera_request(id="action", serviceId=service_id, action=action)
         LOG.debug(
-            "call_service: " "result of vera_request with id %s: %s",
+            "call_service: " "result of vera_request for %s with id %s: %s",
+            self.name,
             service_id,
             result.text,
         )
         return result
+
+    def poll_device(self) -> None:
+        """Poll the device to try and connect."""
+        self.call_service(self.poll_service, "Poll")
 
     def set_cache_value(self, name: str, value: Any) -> None:
         """Set a variable in the local state dictionary.
@@ -660,7 +670,7 @@ class VeraDevice:
         """Get any alerts present during the most recent poll cycle."""
         return self.alerts
 
-    def refresh(self) -> None:
+    def refresh(self, poll_on_failure: bool = False) -> None:
         """Refresh the dev_info data used by get_value.
 
         Only needed if you're not using subscriptions.
@@ -670,6 +680,9 @@ class VeraDevice:
         for device_data in devices:
             if device_data.get("id") == self.device_id:
                 self.update(device_data)
+
+        if poll_on_failure and self.comm_failure:
+            self.poll_device()
 
     def update(self, params: dict) -> None:
         """Update the dev_info data from a dictionary.
@@ -785,7 +798,7 @@ class VeraDevice:
     @property
     def should_poll(self) -> bool:
         """Whether polling is needed if using subscriptions for this device."""
-        return False
+        return self.comm_failure
 
 
 class VeraSwitch(VeraDevice):
