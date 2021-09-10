@@ -545,8 +545,7 @@ class VeraDevice:
         self,
         service_id: Union[str, Tuple[str, ...]],
         set_name: str,
-        parameter_name: str,
-        value: Any,
+        parameter: dict,
     ) -> None:
         """Set a variable on the vera device.
 
@@ -556,14 +555,16 @@ class VeraDevice:
             "id": "lu_action",
             "action": "Set" + set_name,
             "serviceId": service_id,
-            parameter_name: value,
         }
+        for param in parameter:
+          payload[param] = parameter[param]
         result = self.vera_request(**payload)
         LOG.debug(
             "set_service_value: " "result of vera_request with payload %s: %s",
             payload,
             result.text,
         )
+        return result
 
     def call_service(self, service_id: str, action: str) -> requests.Response:
         """Call a Vera service.
@@ -803,7 +804,7 @@ class VeraSwitch(VeraDevice):
 
     def set_switch_state(self, state: int) -> None:
         """Set the switch state, also update local state."""
-        self.set_service_value(self.switch_service, "Target", "newTargetValue", state)
+        self.set_service_value(self.switch_service, "Target", {"newTargetValue", state})
         self.set_cache_value("Status", state)
 
     def switch_on(self) -> None:
@@ -1035,9 +1036,13 @@ class VeraLock(VeraDevice):
 
     def set_lock_state(self, state: int) -> None:
         """Set the lock state, also update local state."""
-        self.set_service_value(self.lock_service, "Target", "newTargetValue", state)
+        self.set_service_value(self.lock_service, "Target", {"newTargetValue": state})
         self.set_cache_value("locked", state)
         self.lock_target = (str(state), time.time())
+
+    def set_new_pin(self, name: str, pin: int) -> None:
+        """Set the lock state, also update local state."""
+        return self.set_service_value(self.lock_service, "Pin", {"UserCodeName": name, "newPin": pin})
 
     def lock(self) -> None:
         """Lock the door."""
@@ -1283,7 +1288,7 @@ class VeraThermostat(VeraDevice):
 
     def set_fan_mode(self, mode: str) -> None:
         """Set the fan mode."""
-        self.set_service_value(self.thermostat_fan_service, "Mode", "NewMode", mode)
+        self.set_service_value(self.thermostat_fan_service, "Mode", {"NewMode", mode})
         self.set_cache_value("fanmode", mode)
 
     def fan_on(self) -> None:
