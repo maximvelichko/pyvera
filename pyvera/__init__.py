@@ -1207,7 +1207,7 @@ class VeraLock(VeraDevice):
                 slot, active = code_addrs[:2]
                 if active != "0":
                     # Since it has additional attributes, get the remaining ones
-                    _, _, pin, name = code_addrs[2:]
+                    _, _, pin, name = code_addrs[2:6]
                     # And add them as a tuple to the list
                     codes.append((slot, name, pin))
             # pylint: disable=broad-except
