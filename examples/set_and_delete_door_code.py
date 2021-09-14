@@ -17,9 +17,9 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="show-lock-info")
     parser.add_argument(
-        "-u", "--url", help="Vera URL, e.g. http://192.168.1.161:3480", required=True
+        "-u", "--url", "-n", "--name", "-p", "--pin", help="Vera URL, e.g. http://192.168.1.161:3480; Name eg: \"John Doe\", Pin eg: \"12345678\"", required=True
     )
-    # args = parser.parse_args()
+    args = parser.parse_args()
 
     # Start the controller
     controller = VeraController('http://192.168.112.202:3480')
@@ -36,7 +36,7 @@ def main() -> None:
                 print("Existing door codes\n {}".format(device.get_pin_codes())) 
                 
                 # set a new door code
-                result = device.set_new_pin(name="John Doe", pin=12121213)
+                result = device.set_new_pin(name=args.name, pin=args.pin)
                 
                 # printing the status code and error if any
                 print("status:"+str(result.status_code), result.text)
