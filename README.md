@@ -50,6 +50,11 @@ If you have locks - this will show you information about them.
 $ ./examples/show_lock_info.py -u http://192.168.1.161:3480/
 ~~~~
 
+Set a new door lock code
+~~~~
+$ ./examples/set_and_delete_door_code.py -u http://192.168.1.161:3480/ -n "John Doe" -p "12345678"
+~~~~
+
 Debugging
 -------
 You may use the PYVERA_LOGLEVEL environment variable to output more verbose messages to the console.  For instance, to show all debug level messages using the list-devices implementation in the example directory, run something similar to:
