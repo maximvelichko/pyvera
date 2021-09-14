@@ -22,7 +22,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # Start the controller
-    controller = VeraController('http://192.168.112.202:3480')
+    controller = VeraController(args.url)
     controller.start()
 
     try:
