@@ -545,6 +545,29 @@ class VeraDevice:
         self,
         service_id: Union[str, Tuple[str, ...]],
         set_name: str,
+        parameter_name: str,
+        value: Any,
+    ) -> None:
+        """Set a variable on the vera device.
+        This will call the Vera api to change device state.
+        """
+        payload = {
+            "id": "lu_action",
+            "action": "Set" + set_name,
+            "serviceId": service_id,
+            parameter_name: value,
+        }
+        result = self.vera_request(**payload)
+        LOG.debug(
+            "set_service_value: " "result of vera_request with payload %s: %s",
+            payload,
+            result.text,
+        )
+
+    def set_door_code_values(
+        self,
+        service_id: Union[str, Tuple[str, ...]],
+        set_name: str,
         parameter: dict,
     ) -> None:
         """Set a variable on the vera device.
@@ -804,7 +827,7 @@ class VeraSwitch(VeraDevice):
 
     def set_switch_state(self, state: int) -> None:
         """Set the switch state, also update local state."""
-        self.set_service_value(self.switch_service, "SetTarget", {"newTargetValue", state})
+        self.set_service_value(self.switch_service, "Target", "newTargetValue", state)
         self.set_cache_value("Status", state)
 
     def switch_on(self) -> None:
@@ -857,7 +880,7 @@ class VeraDimmer(VeraSwitch):
             percent = round(brightness / 2.55)
 
         self.set_service_value(
-            self.dimmer_service, "SetLoadLevelTarget", "newLoadlevelTarget", percent
+            self.dimmer_service, "LoadLevelTarget", "newLoadlevelTarget", percent
         )
         self.set_cache_value("level", percent)
 
@@ -905,7 +928,7 @@ class VeraDimmer(VeraSwitch):
 
         target = ",".join([str(c) for c in rgb])
         self.set_service_value(
-            self.color_service, "SetColorRGB", "newColorRGBTarget", target
+            self.color_service, "ColorRGB", "newColorRGBTarget", target
         )
 
         rgbi = self.get_color_index(["R", "G", "B"])
@@ -935,7 +958,7 @@ class VeraArmableDevice(VeraSwitch):
     def set_armed_state(self, state: int) -> None:
         """Set the armed state, also update local state."""
         self.set_service_value(
-            self.security_sensor_service, "SetArmed", "newArmedValue", state
+            self.security_sensor_service, "Armed", "newArmedValue", state
         )
         self.set_cache_value("Armed", state)
 
@@ -1021,7 +1044,7 @@ class VeraCurtain(VeraSwitch):
         Scale is 0-100
         """
         self.set_service_value(
-            self.dimmer_service, "SetLoadLevelTarget", "newLoadlevelTarget", level
+            self.dimmer_service, "LoadLevelTarget", "newLoadlevelTarget", level
         )
 
         self.set_cache_value("level", level)
@@ -1036,17 +1059,17 @@ class VeraLock(VeraDevice):
 
     def set_lock_state(self, state: int) -> None:
         """Set the lock state, also update local state."""
-        self.set_service_value(self.lock_service, "SetTarget", {"newTargetValue": state})
+        self.set_service_value(self.lock_service, "Target", "newTargetValue", state)
         self.set_cache_value("locked", state)
         self.lock_target = (str(state), time.time())
 
     def set_new_pin(self, name: str, pin: int) -> None:
         """Set the lock state, also update local state."""
-        return self.set_service_value(self.lock_service, "SetPin", {"UserCodeName": name, "newPin": pin})
+        return self.set_door_code_values(self.lock_service, "SetPin", {"UserCodeName": name, "newPin": pin})
 		
     def clear_slot_pin(self, slot: int) -> None:
         """Set the lock state, also update local state."""
-        return self.set_service_value(self.lock_service, "ClearPin", {"UserCode": slot})
+        return self.set_door_code_values(self.lock_service, "ClearPin", {"UserCode": slot})
 
     def lock(self) -> None:
         """Lock the door."""
@@ -1238,7 +1261,7 @@ class VeraThermostat(VeraDevice):
         """Set current goal temperature / setpoint."""
 
         self.set_service_value(
-            self.thermostat_setpoint, "SetCurrentSetpoint", "NewCurrentSetpoint", temp
+            self.thermostat_setpoint, "CurrentSetpoint", "NewCurrentSetpoint", temp
         )
 
         self.set_cache_value("setpoint", temp)
@@ -1264,7 +1287,7 @@ class VeraThermostat(VeraDevice):
     def set_hvac_mode(self, mode: str) -> None:
         """Set the hvac mode."""
         self.set_service_value(
-            self.thermostat_operating_service, "SetModeTarget", "NewModeTarget", mode
+            self.thermostat_operating_service, "ModeTarget", "NewModeTarget", mode
         )
         self.set_cache_value("mode", mode)
 
@@ -1292,7 +1315,7 @@ class VeraThermostat(VeraDevice):
 
     def set_fan_mode(self, mode: str) -> None:
         """Set the fan mode."""
-        self.set_service_value(self.thermostat_fan_service, "SetMode", {"NewMode", mode})
+        self.set_service_value(self.thermostat_fan_service, "Mode", "NewMode", mode)
         self.set_cache_value("fanmode", mode)
 
     def fan_on(self) -> None:

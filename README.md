@@ -52,7 +52,12 @@ $ ./examples/show_lock_info.py -u http://192.168.1.161:3480/
 
 Set a new door lock code
 ~~~~
-$ ./examples/set_and_delete_door_code.py -u http://192.168.1.161:3480/ -n "John Doe" -p "12345678"
+$ ./examples/set_door_code.py -u http://192.168.1.161:3480/ -n "John Doe" -p "12345678"
+~~~~
+
+Clear a existing door lock code
+~~~~
+$ ./examples/delete_door_code.py -u http://192.168.1.161:3480/ -n "John Doe" -p "12345678"
 ~~~~
 
 Debugging
