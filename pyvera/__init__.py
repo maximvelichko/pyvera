@@ -549,6 +549,7 @@ class VeraDevice:
         value: Any,
     ) -> None:
         """Set a variable on the vera device.
+
         This will call the Vera api to change device state.
         """
         payload = {
