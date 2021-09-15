@@ -27,31 +27,30 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Start the controller
+    ## Start the controller
     controller = VeraController(args.url)
     controller.start()
 
     try:
         # Get a list of all the devices on the vera controller
-        all_devices = controller.get_devices("VeraLock")
+        all_devices = controller.get_devices("Doorlock")
 
         # Look over the list and find the lock devices
         for device in all_devices:
-            if isinstance(device, VeraLock):
-                # show exisiting door codes
-                print("Existing door codes:\n {}".format(device.get_pin_codes())) 
-                
-                # set a new door code
-                result = device.set_new_pin(name=args.name, pin=args.pin)
-                
-                # printing the status code and error if any for debug logs
-                # print("status:"+str(result.status_code), result.text)
+            # show exisiting door codes
+            print("Existing door codes:\n {}".format(device.get_pin_codes()))
 
-                if result.status_code==200:
-                    print("\nCommand succesfully sent to Lock \
-                    \nWait for the lock to process the request")
-                else:
-                    print("\nLock command "+result.text)
+            # set a new door code
+            result = device.set_new_pin(name=args.name, pin=args.pin)
+
+            # printing the status code and error if any for debug logs
+            # print("status:"+str(result.status_code), result.text)
+
+            if result.status_code == 200:
+                print("\nCommand succesfully sent to Lock \
+                \nWait for the lock to process the request")
+            else:
+                print("\nLock command "+result.text)
     finally:
         # Stop the subscription listening thread so we can quit
         controller.stop()
