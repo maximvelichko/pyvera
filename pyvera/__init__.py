@@ -581,7 +581,7 @@ class VeraDevice:
             "serviceId": service_id,
         }
         for param in parameter:
-          payload[param] = parameter[param]
+            payload[param] = parameter[param]
         result = self.vera_request(**payload)
         LOG.debug(
             "set_service_value: " "result of vera_request with payload %s: %s",
@@ -1066,11 +1066,15 @@ class VeraLock(VeraDevice):
 
     def set_new_pin(self, name: str, pin: int) -> None:
         """Set the lock state, also update local state."""
-        return self.set_door_code_values(self.lock_service, "SetPin", {"UserCodeName": name, "newPin": pin})
+        return self.set_door_code_values(
+            self.lock_service, "SetPin", {"UserCodeName": name, "newPin": pin}
+        )
 
     def clear_slot_pin(self, slot: int) -> None:
         """Set the lock state, also update local state."""
-        return self.set_door_code_values(self.lock_service, "ClearPin", {"UserCode": slot})
+        return self.set_door_code_values(
+            self.lock_service, "ClearPin", {"UserCode": slot}
+        )
 
     def lock(self) -> None:
         """Lock the door."""
