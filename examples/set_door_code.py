@@ -3,7 +3,7 @@
 
 # Parse Arguments
 # Import project path
-import argparse, time
+import argparse
 import os
 import sys
 
@@ -33,7 +33,7 @@ def main() -> None:
 
     try:
         # Get a list of all the devices on the vera controller
-        all_devices = controller.get_devices()
+        all_devices = controller.get_devices("VeraLock")
 
         # Look over the list and find the lock devices
         for device in all_devices:

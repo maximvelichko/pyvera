@@ -1066,7 +1066,7 @@ class VeraLock(VeraDevice):
     def set_new_pin(self, name: str, pin: int) -> None:
         """Set the lock state, also update local state."""
         return self.set_door_code_values(self.lock_service, "SetPin", {"UserCodeName": name, "newPin": pin})
-		
+
     def clear_slot_pin(self, slot: int) -> None:
         """Set the lock state, also update local state."""
         return self.set_door_code_values(self.lock_service, "ClearPin", {"UserCode": slot})
@@ -1227,7 +1227,7 @@ class VeraLock(VeraDevice):
             LOG.error("Got unsupported string %s: %s", val, ex)
 
         # Loop to create a list of codes
-        codes = {}
+        codes = []
         for code in raw_code_list:
 
             try:
@@ -1241,7 +1241,7 @@ class VeraLock(VeraDevice):
                     # Since it has additional attributes, get the remaining ones
                     _, _, pin, name = code_addrs[2:6]
                     # And add them as a tuple to the list
-                    codes[slot]={'name': name, 'pin': pin}
+                    codes.append((slot, name, pin))
             # pylint: disable=broad-except
             except Exception as ex:
                 LOG.error("Problem parsing pin code string %s: %s", code, ex)

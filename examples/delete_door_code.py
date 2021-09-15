@@ -3,7 +3,7 @@
 
 # Parse Arguments
 # Import project path
-import argparse, time
+import argparse
 import os
 import sys
 
