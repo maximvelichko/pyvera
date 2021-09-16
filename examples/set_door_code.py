@@ -23,7 +23,7 @@ def main() -> None:
     parser.add_argument("-p", "--pin", help='Pin eg: "12345678"', required=True)
     args = parser.parse_args()
 
-    ## Start the controller
+    # Start the controller
     controller = VeraController(args.url)
     controller.start()
 
@@ -43,11 +43,11 @@ def main() -> None:
                 # printing the status code and error if any for debug logs
                 # print("status:"+str(result.status_code), result.text)
 
-                if result.status_code==200:
+                if result.status_code == 200:
                     print("\nCommand succesfully sent to Lock \
                     \nWait for the lock to process the request")
                 else:
-                    print("\nLock command "+result.text)
+                    print("\nLock command " + result.text)
     finally:
         # Stop the subscription listening thread so we can quit
         controller.stop()
