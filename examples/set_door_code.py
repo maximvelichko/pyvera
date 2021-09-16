@@ -33,22 +33,21 @@ def main() -> None:
 
         # Look over the list and find the lock devices
         for device in all_devices:
-            # show exisiting door codes
-            print("Existing door codes:\n {}".format(device.get_pin_codes()))
+            if isinstance(device, VeraLock):
+                # show exisiting door codes
+                print("Existing door codes:\n {}".format(device.get_pin_codes()))
 
-            # set a new door code
-            result = device.set_new_pin(name=args.name, pin=args.pin)
+                # set a new door code
+                result = device.set_new_pin(name=args.name, pin=args.pin)
 
-            # printing the status code and error if any for debug logs
-            # print("status:"+str(result.status_code), result.text)
+                # printing the status code and error if any for debug logs
+                # print("status:"+str(result.status_code), result.text)
 
-            if result.status_code == 200:
-                print(
-                    "\nCommand succesfully sent to Lock \
-                \nWait for the lock to process the request"
-                )
-            else:
-                print("\nLock command " + result.text)
+                if result.status_code==200:
+                    print("\nCommand succesfully sent to Lock \
+                    \nWait for the lock to process the request")
+                else:
+                    print("\nLock command "+result.text)
     finally:
         # Stop the subscription listening thread so we can quit
         controller.stop()
