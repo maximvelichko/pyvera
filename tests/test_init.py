@@ -253,6 +253,8 @@ def test_lock(vera_controller_data: VeraControllerData) -> None:
     assert device.is_locked() is True
     device.unlock()
     assert device.is_locked() is False
+    assert device.set_new_pin(name="John Doe", pin=12121212).status_code == 200
+    assert device.clear_slot_pin(slot=1).status_code == 200
 
 
 def test_thermostat(vera_controller_data: VeraControllerData) -> None:
