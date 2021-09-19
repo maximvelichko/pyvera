@@ -568,23 +568,23 @@ class VeraDevice:
     def set_door_code_values(
         self,
         service_id: Union[str, Tuple[str, ...]],
-        set_name: str,
+        operation: str,
         parameter: dict,
-    ) -> None:
-        """Set a variable on the vera device.
+    ) -> requests.Response:
+        """Add or remove door code on the vera Lock.
 
-        This will call the Vera api to change device state.
+        This will call the Vera api to change Lock code.
         """
         payload = {
             "id": "lu_action",
-            "action": set_name,
+            "action": operation,
             "serviceId": service_id,
         }
         for param in parameter:
             payload[param] = parameter[param]
         result = self.vera_request(**payload)
         LOG.debug(
-            "set_service_value: " "result of vera_request with payload %s: %s",
+            "set_door_code_values: " "result of vera_request with payload %s: %s",
             payload,
             result.text,
         )
@@ -1064,13 +1064,13 @@ class VeraLock(VeraDevice):
         self.set_cache_value("locked", state)
         self.lock_target = (str(state), time.time())
 
-    def set_new_pin(self, name: str, pin: int) -> None:
+    def set_new_pin(self, name: str, pin: int) -> requests.Response:
         """Set the lock state, also update local state."""
         return self.set_door_code_values(
-            self.lock_service, "SetPin", {"UserCodeName": name, "newPin": pin}
+            self.lock_service, "SetPin", {"UserCodeName": name, "Pin": pin}
         )
 
-    def clear_slot_pin(self, slot: int) -> None:
+    def clear_slot_pin(self, slot: int) -> requests.Response:
         """Set the lock state, also update local state."""
         return self.set_door_code_values(
             self.lock_service, "ClearPin", {"UserCode": slot}
