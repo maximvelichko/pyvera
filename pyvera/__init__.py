@@ -566,20 +566,13 @@ class VeraDevice:
         )
 
     def set_door_code_values(
-        self,
-        service_id: Union[str, Tuple[str, ...]],
-        operation: str,
-        parameter: dict,
+        self, service_id: Union[str, Tuple[str, ...]], operation: str, parameter: dict,
     ) -> requests.Response:
         """Add or remove door code on the vera Lock.
 
         This will call the Vera api to change Lock code.
         """
-        payload = {
-            "id": "lu_action",
-            "action": operation,
-            "serviceId": service_id,
-        }
+        payload = {"id": "lu_action", "action": operation, "serviceId": service_id}
         for param in parameter:
             payload[param] = parameter[param]
         result = self.vera_request(**payload)
