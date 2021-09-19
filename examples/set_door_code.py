@@ -44,8 +44,10 @@ def main() -> None:
                 # print("status:"+str(result.status_code), result.text)
 
                 if result.status_code == 200:
-                    print("\nCommand succesfully sent to Lock \
-                    \nWait for the lock to process the request")
+                    print(
+                        "\nCommand succesfully sent to Lock \
+                    \nWait for the lock to process the request"
+                    )
                 else:
                     print("\nLock command " + result.text)
     finally:

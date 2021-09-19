@@ -41,8 +41,10 @@ def main() -> None:
                 # This example deletes a previously added slot by getting the no:of slots already allocated
                 result = device.clear_slot_pin(slot=args.slot)
                 if result.status_code == 200:
-                    print("\nCommand succesfully sent to Lock \
-                    \nWait for the lock to process the request")
+                    print(
+                        "\nCommand succesfully sent to Lock \
+                    \nWait for the lock to process the request"
+                    )
                 else:
                     print("\nLock command " + result.text)
 
