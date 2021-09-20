@@ -566,7 +566,7 @@ class VeraDevice:
         )
 
     def set_door_code_values(
-        self, service_id: Union[str, Tuple[str, ...]], operation: str, parameter: dict,
+        self, service_id: Union[str, Tuple[str, ...]], operation: str, parameter: dict
     ) -> requests.Response:
         """Add or remove door code on the vera Lock.
 
