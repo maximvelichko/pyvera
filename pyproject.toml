@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyvera"
-version = "0.3.13"
+version = "0.3.14"
 description = "Python API for talking to Veracontrollers"
 
 license = "GPL2"

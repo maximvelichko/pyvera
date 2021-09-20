@@ -161,9 +161,18 @@ def handle_lu_action(payload: dict, api_data: VeraApiData) -> ResponsesResponse:
     device_id = int(params.pop("DeviceNum"))
     params.pop("output_format")
     set_state_variable_name = next(
-        key for key in params if key.lower().startswith("new")
+        (key for key in params if key.lower().startswith("new")),
+        "UserCodeName"
+        if "UserCodeName" in params.keys()
+        else "UserCode"
+        if "UserCode" in params.keys()
+        else None,
     )
-    state_variable_name = set_state_variable_name[3:]
+    state_variable_name = (
+        str(set_state_variable_name)[3:]
+        if "UserCode" not in str(set_state_variable_name)
+        else set_state_variable_name
+    )
     state_variable_value = params.pop(set_state_variable_name)
     status_variable_name = None
 

@@ -565,6 +565,24 @@ class VeraDevice:
             result.text,
         )
 
+    def set_door_code_values(
+        self, service_id: Union[str, Tuple[str, ...]], operation: str, parameter: dict
+    ) -> requests.Response:
+        """Add or remove door code on the vera Lock.
+
+        This will call the Vera api to change Lock code.
+        """
+        payload = {"id": "lu_action", "action": operation, "serviceId": service_id}
+        for param in parameter:
+            payload[param] = parameter[param]
+        result = self.vera_request(**payload)
+        LOG.debug(
+            "set_door_code_values: " "result of vera_request with payload %s: %s",
+            payload,
+            result.text,
+        )
+        return result
+
     def call_service(self, service_id: str, action: str) -> requests.Response:
         """Call a Vera service.
 
@@ -1039,6 +1057,18 @@ class VeraLock(VeraDevice):
         self.set_cache_value("locked", state)
         self.lock_target = (str(state), time.time())
 
+    def set_new_pin(self, name: str, pin: int) -> requests.Response:
+        """Set the lock state, also update local state."""
+        return self.set_door_code_values(
+            self.lock_service, "SetPin", {"UserCodeName": name, "Pin": pin}
+        )
+
+    def clear_slot_pin(self, slot: int) -> requests.Response:
+        """Set the lock state, also update local state."""
+        return self.set_door_code_values(
+            self.lock_service, "ClearPin", {"UserCode": slot}
+        )
+
     def lock(self) -> None:
         """Lock the door."""
         self.set_lock_state(1)
@@ -1207,7 +1237,7 @@ class VeraLock(VeraDevice):
                 slot, active = code_addrs[:2]
                 if active != "0":
                     # Since it has additional attributes, get the remaining ones
-                    _, _, pin, name = code_addrs[2:]
+                    _, _, pin, name = code_addrs[2:6]
                     # And add them as a tuple to the list
                     codes.append((slot, name, pin))
             # pylint: disable=broad-except
