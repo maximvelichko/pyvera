@@ -1060,7 +1060,7 @@ class VeraLock(VeraDevice):
     def set_new_pin(self, name: str, pin: int) -> requests.Response:
         """Set the lock state, also update local state."""
         return self.set_door_code_values(
-            self.lock_service, "SetPin", {"UserCodeName": name, "Pin": pin}
+            self.lock_service, "SetPin", {"UserCodeName": name, "newPin": pin}
         )
 
     def clear_slot_pin(self, slot: int) -> requests.Response:
