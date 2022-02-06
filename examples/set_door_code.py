@@ -20,7 +20,8 @@ def main() -> None:
         "-u", "--url", help="Vera URL, e.g. http://192.168.1.161:3480;", required=True
     )
     parser.add_argument("-n", "--name", help='Name eg: "John Doe"', required=True)
-    parser.add_argument("-p", "--pin", help='Pin eg: "12345678"', required=True)
+    parser.add_argument("-p", "--pin", help='Pin eg: "5678"', required=True)
+    parser.add_argument("-i", "--id", help='Device ID: "123"', required=True)
     args = parser.parse_args()
 
     # Start the controller
@@ -28,28 +29,25 @@ def main() -> None:
     controller.start()
 
     try:
-        # Get a list of all the devices on the vera controller
-        all_devices = controller.get_devices("Doorlock")
+        device = controller.get_device_by_id(int(args.id))
 
-        # Look over the list and find the lock devices
-        for device in all_devices:
-            if isinstance(device, VeraLock):
-                # show exisiting door codes
-                print("Existing door codes:\n {}".format(device.get_pin_codes()))
+        if isinstance(device, VeraLock):
+            # show exisiting door codes
+            print("Existing door codes:\n {}".format(device.get_pin_codes()))
 
-                # set a new door code
-                result = device.set_new_pin(name=args.name, pin=args.pin)
+            # set a new door code
+            result = device.set_new_pin(name=args.name, pin=args.pin)
 
-                # printing the status code and error if any for debug logs
-                # print("status:"+str(result.status_code), result.text)
+            # printing the status code and error if any for debug logs
+            # print("status:"+str(result.status_code), result.text)
 
-                if result.status_code == 200:
-                    print(
-                        "\nCommand succesfully sent to Lock \
-                    \nWait for the lock to process the request"
-                    )
-                else:
-                    print("\nLock command " + result.text)
+            if result.status_code == 200:
+                print(
+                    "\nCommand succesfully sent to Lock \
+                \nWait for the lock to process the request"
+                )
+            else:
+                print("\nLock command " + result.text)
     finally:
         # Stop the subscription listening thread so we can quit
         controller.stop()
