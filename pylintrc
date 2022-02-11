@@ -9,7 +9,8 @@ jobs=4
 disable=
   format,
   too-many-arguments,
-  too-few-public-methods
+  too-few-public-methods,
+  unsubscriptable-object
 
 [REPORTS]
 reports=no
