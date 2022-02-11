@@ -50,14 +50,19 @@ If you have locks - this will show you information about them.
 $ ./examples/show_lock_info.py -u http://192.168.1.161:3480/
 ~~~~
 
-Set a new door lock code
+View existing locks and PINs:
 ~~~~
-$ ./examples/set_door_code.py -u http://192.168.1.161:3480/ -n "John Doe" -p "12345678"
+$ ./examples/show_lock_info.py -u http://192.168.1.161:3480/
 ~~~~
 
-Clear a existing door lock code
+Set a new door lock code on device 335:
 ~~~~
-$ ./examples/delete_door_code.py -u http://192.168.1.161:3480/ -n "John Doe" -p "12345678"
+$ ./examples/set_door_code.py -u http://192.168.1.161:3480/ -i 335 -n "John Doe" -p "5678"
+~~~~
+
+Clear a existing door lock code from device 335:
+~~~~
+$ ./examples/delete_door_code.py -u http://192.168.1.161:3480/ -i 335 -n "John Doe"
 ~~~~
 
 Debugging
