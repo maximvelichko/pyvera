@@ -1259,17 +1259,17 @@ class VeraThermostat(VeraDevice):
         """Set current goal temperature / setpoint."""
 
         self.set_service_value(
-            self.thermostat_setpoint, "CurrentSetpoint", "NewCurrentSetpoint", temp
+            self._thermostat_setpoint, "CurrentSetpoint", "NewCurrentSetpoint", temp
         )
 
-        self.set_cache_value("setpoint", temp)
+        self.set_cache_value(self._setpoint_cache_value_name, temp)
 
     def get_current_goal_temperature(self, refresh: bool = False) -> Optional[float]:
         """Get current goal temperature / setpoint."""
         if refresh:
             self.refresh()
         try:
-            return float(self.get_value("setpoint"))
+            return float(self.get_value(self._setpoint_cache_value_name))
         except (TypeError, ValueError):
             return None
 
@@ -1343,6 +1343,54 @@ class VeraThermostat(VeraDevice):
     def fan_cycle(self) -> None:
         """Set fan to cycle."""
         self.set_fan_mode("PeriodicOn")
+
+    def _has_double_setpoints(self) -> bool:
+        """Determines if a thermostate has two setpoints"""
+        if self.get_value("setpoint"):
+            return False
+
+        if self.get_value("heatsp") and self.get_value("coolsp"):
+            return True
+
+        return False
+
+    def _is_heating_recommened(self) -> bool:
+        mode = self.get_value("mode")
+        state = self.get_value("hvacstate")
+
+        if mode == "HeatOn":
+            return True
+
+        if mode == "CoolOn":
+            return False
+
+        if state == "Heating":
+            return True
+
+        if state == "Cooling":
+            return False
+
+        return True
+
+    @property
+    def _setpoint_cache_value_name(self) -> str:
+        if self._has_double_setpoints():
+            if self._is_heating_recommened():
+                return "heatsp"
+            else:
+                return "coolsp"
+        else:
+            return "setpoint"
+
+    @property
+    def _thermostat_setpoint(self) -> str:
+        if self._has_double_setpoints():
+            if self._is_heating_recommened():
+                return self.thermostat_heat_setpoint
+            else:
+                return self.thermostat_cool_setpoint
+        else:
+            return self.thermostat_setpoint
 
 
 class VeraSceneController(VeraDevice):
