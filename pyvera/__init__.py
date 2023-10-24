@@ -1227,7 +1227,6 @@ class VeraLock(VeraDevice):
         # Loop to create a list of codes
         codes = []
         for code in raw_code_list:
-
             try:
                 # Strip off trailing semicolon
                 # Create a list from csv
