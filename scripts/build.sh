@@ -23,7 +23,6 @@ echo
 echo "===Installing dependencies==="
 poetry install
 
-
 echo
 echo "===Sorting imports==="
 ISORT_ARGS="--apply"
@@ -60,7 +59,33 @@ flake8
 
 echo
 echo "===Lint with pylint==="
+set +e +o pipefail
 pylint $LINT_PATHS
+pylint_exitcode=$?
+set -e -o pipefail
+
+if (( (pylint_exitcode & 0x1) != 0 )); then
+    echo "=> Fatal"
+fi
+if (( (pylint_exitcode & 0x2) != 0 )); then
+    echo "=> Error"
+fi
+if (( (pylint_exitcode & 0x4) != 0 )); then
+    echo "=> Warning"
+fi
+if (( (pylint_exitcode & 0x8) != 0 )); then
+    echo "=> Refactor"
+fi
+if (( (pylint_exitcode & 0x10) != 0 )); then
+    echo "=> Convention"
+fi
+if (( (pylint_exitcode & 0x20) != 0 )); then
+    echo "=> Usage"
+fi
+if (( (pylint_exitcode & 0x23) != 0 )); then
+    echo "=> Fatal, Errors or Usage"
+    exit 1
+fi
 
 
 echo
@@ -71,7 +96,6 @@ pytest
 echo
 echo "===Building package==="
 poetry build
-
 
 echo
 echo "===Uploading code coverage==="
