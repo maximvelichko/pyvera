@@ -37,7 +37,7 @@ pytest = "==7.4.2"
 pytest-cov = "==4.1.0"
 responses = "==0.10.6"
 toml = "==0.10.0"  # Needed by isort and others.
-wheel = "==0.33.6"  # Needed for successful compile of other modules.
+wheel = "==0.38.1"  # Needed for successful compile of other modules.
 
 [tool.black]
 target-version = ["py35", "py36", "py37", "py38"]
