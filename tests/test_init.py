@@ -38,6 +38,7 @@ from .common import (
     DEVICE_SWITCH_ID,
     DEVICE_TEMP_SENSOR_ID,
     DEVICE_THERMOSTAT_ID,
+    DEVICE_THERMOSTAT2_ID,
     DEVICE_UV_SENSOR_ID,
     VeraControllerData,
     update_device,
@@ -108,6 +109,14 @@ def test__event_device_for_vera_lock_status() -> None:
     registry._event_device(mock_lock, device_json, [])
     mock_lock.update.assert_called_once_with(device_json)
 
+def test_refresh_data(vera_controller_data: VeraControllerData) -> None:
+    """Test function."""
+    controller = vera_controller_data.controller
+    data = controller.refresh_data()
+    assert len(data) == 20
+
+    services = controller.map_services()
+    assert services == None
 
 def test_polling(vera_controller_data: VeraControllerData) -> None:
     """Test function."""
@@ -257,20 +266,28 @@ def test_lock(vera_controller_data: VeraControllerData) -> None:
     assert device.clear_slot_pin(slot=1).status_code == 200
 
 
+# pylint: disable=protected-access
 def test_thermostat(vera_controller_data: VeraControllerData) -> None:
     """Test function."""
     controller = vera_controller_data.controller
-    device = cast(VeraThermostat, controller.get_device_by_id(DEVICE_THERMOSTAT_ID))
-    controller.register(device, lambda device: None)
+    device1 = cast(VeraThermostat, controller.get_device_by_id(DEVICE_THERMOSTAT_ID))
+    device2 = cast(VeraThermostat, controller.get_device_by_id(DEVICE_THERMOSTAT2_ID))
+    controller.register(device1, lambda device: None)
+    controller.register(device2, lambda device: None)
 
-    assert device.get_current_goal_temperature(refresh=True) == 8.0
-    assert device.get_current_temperature(refresh=True) == 9.0
-    assert device.get_hvac_mode(refresh=True) == "Off"
-    assert device.get_fan_mode(refresh=True) == "Off"
-    assert device.get_hvac_state(refresh=True) == "Off"
+    all_devices = (device1, device2)
 
-    device.set_temperature(72)
-    assert device.get_current_goal_temperature() == 72
+    assert device1.get_current_goal_temperature(refresh=True) == 8.0
+    assert device2.get_current_goal_temperature(refresh=True) == 7.0
+
+    for device in all_devices:
+        assert device.get_current_temperature(refresh=True) == 9.0
+        assert device.get_hvac_mode(refresh=True) == "Off"
+        assert device.get_fan_mode(refresh=True) == "Off"
+        assert device.get_hvac_state(refresh=True) == "Off"
+
+    assert device1._has_double_setpoints() == False
+    assert device2._has_double_setpoints() == True
 
     update_device(
         controller_data=vera_controller_data,
@@ -278,27 +295,48 @@ def test_thermostat(vera_controller_data: VeraControllerData) -> None:
         key="temperature",
         value=65,
     )
-    assert device.get_current_temperature() == 65
+    assert device1.get_current_temperature() == 65
 
-    device.turn_auto_on()
-    assert device.get_hvac_mode() == "AutoChangeOver"
-    device.turn_heat_on()
-    assert device.get_hvac_mode() == "HeatOn"
-    device.turn_cool_on()
-    assert device.get_hvac_mode() == "CoolOn"
+    for device in all_devices:
+        device.set_temperature(72)
+        assert device.get_current_goal_temperature() == 72
 
-    device.fan_on()
-    assert device.get_fan_mode() == "ContinuousOn"
-    device.fan_auto()
-    assert device.get_fan_mode() == "Auto"
-    device.fan_cycle()
-    assert device.get_fan_mode() == "PeriodicOn"
-    device.fan_off()
-    assert device.get_fan_mode() == "Off"
+        device.turn_auto_on()
+        assert device.get_hvac_mode() == "AutoChangeOver"
+        device.turn_heat_on()
+        assert device.get_hvac_mode() == "HeatOn"
+        device.turn_cool_on()
+        assert device.get_hvac_mode() == "CoolOn"
 
-    device.turn_off()
-    assert device.get_hvac_mode() == "Off"
+        device.fan_on()
+        assert device.get_fan_mode() == "ContinuousOn"
+        device.fan_auto()
+        assert device.get_fan_mode() == "Auto"
+        device.fan_cycle()
+        assert device.get_fan_mode() == "PeriodicOn"
+        device.fan_off()
+        assert device.get_fan_mode() == "Off"
 
+        device.turn_off()
+        assert device.get_hvac_mode() == "Off"
+
+    device2.turn_heat_on()
+    device2.set_temperature(75)
+    assert device2.get_current_goal_temperature() == 75
+    assert device2.get_value("heatsp") == '75'
+
+    device2.turn_cool_on()
+    device2.set_temperature(60)
+    assert device2.get_current_goal_temperature() == 60
+    assert device2.get_value("coolsp") == '60'
+
+    device2.turn_heat_on()
+    assert device2.get_current_goal_temperature() == 75
+    assert device2.get_value("heatsp") == '75'
+
+    device2.turn_cool_on()
+    assert device2.get_current_goal_temperature() == 60
+    assert device2.get_value("coolsp") == '60'
 
 def test_curtain(vera_controller_data: VeraControllerData) -> None:
     """Test function."""

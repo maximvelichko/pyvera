@@ -1353,7 +1353,7 @@ class VeraThermostat(VeraDevice):
 
         return False
 
-    def _is_heating_recommened(self) -> bool:
+    def _is_heating_recommended(self) -> bool:
         mode = self.get_value("mode")
         state = self.get_value("hvacstate")
 
@@ -1374,7 +1374,7 @@ class VeraThermostat(VeraDevice):
     @property
     def _setpoint_cache_value_name(self) -> str:
         if self._has_double_setpoints():
-            if self._is_heating_recommened():
+            if self._is_heating_recommended():
                 return "heatsp"
             else:
                 return "coolsp"
@@ -1384,7 +1384,7 @@ class VeraThermostat(VeraDevice):
     @property
     def _thermostat_setpoint(self) -> str:
         if self._has_double_setpoints():
-            if self._is_heating_recommened():
+            if self._is_heating_recommended():
                 return self.thermostat_heat_setpoint
             else:
                 return self.thermostat_cool_setpoint
