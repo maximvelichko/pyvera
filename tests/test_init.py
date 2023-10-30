@@ -37,8 +37,8 @@ from .common import (
     DEVICE_SWITCH2_ID,
     DEVICE_SWITCH_ID,
     DEVICE_TEMP_SENSOR_ID,
-    DEVICE_THERMOSTAT_ID,
     DEVICE_THERMOSTAT2_ID,
+    DEVICE_THERMOSTAT_ID,
     DEVICE_UV_SENSOR_ID,
     VeraControllerData,
     update_device,
@@ -109,6 +109,7 @@ def test__event_device_for_vera_lock_status() -> None:
     registry._event_device(mock_lock, device_json, [])
     mock_lock.update.assert_called_once_with(device_json)
 
+
 def test_refresh_data(vera_controller_data: VeraControllerData) -> None:
     """Test function."""
     controller = vera_controller_data.controller
@@ -117,6 +118,7 @@ def test_refresh_data(vera_controller_data: VeraControllerData) -> None:
 
     services = controller.map_services()
     assert services == None
+
 
 def test_polling(vera_controller_data: VeraControllerData) -> None:
     """Test function."""
@@ -323,20 +325,21 @@ def test_thermostat(vera_controller_data: VeraControllerData) -> None:
     device2.turn_heat_on()
     device2.set_temperature(75)
     assert device2.get_current_goal_temperature() == 75
-    assert device2.get_value("heatsp") == '75'
+    assert device2.get_value("heatsp") == "75"
 
     device2.turn_cool_on()
     device2.set_temperature(60)
     assert device2.get_current_goal_temperature() == 60
-    assert device2.get_value("coolsp") == '60'
+    assert device2.get_value("coolsp") == "60"
 
     device2.turn_heat_on()
     assert device2.get_current_goal_temperature() == 75
-    assert device2.get_value("heatsp") == '75'
+    assert device2.get_value("heatsp") == "75"
 
     device2.turn_cool_on()
     assert device2.get_current_goal_temperature() == 60
-    assert device2.get_value("coolsp") == '60'
+    assert device2.get_value("coolsp") == "60"
+
 
 def test_curtain(vera_controller_data: VeraControllerData) -> None:
     """Test function."""
