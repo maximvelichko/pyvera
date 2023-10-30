@@ -117,7 +117,7 @@ def test_refresh_data(vera_controller_data: VeraControllerData) -> None:
     assert len(data) == 20
 
     services = controller.map_services()
-    assert services == None
+    assert services is None
 
 
 def test_polling(vera_controller_data: VeraControllerData) -> None:
@@ -288,8 +288,8 @@ def test_thermostat(vera_controller_data: VeraControllerData) -> None:
         assert device.get_fan_mode(refresh=True) == "Off"
         assert device.get_hvac_state(refresh=True) == "Off"
 
-    assert device1._has_double_setpoints() == False
-    assert device2._has_double_setpoints() == True
+    assert device1._has_double_setpoints() is False
+    assert device2._has_double_setpoints() is True
 
     update_device(
         controller_data=vera_controller_data,
