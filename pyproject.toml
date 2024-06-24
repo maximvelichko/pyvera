@@ -9,6 +9,9 @@ authors = [
     "James Cole",
     "Greg Dowling <mail@gregdowling.com>"
 ]
+classifiers = [
+  "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+]
 
 readme = 'README.md'
 
