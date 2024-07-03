@@ -340,6 +340,7 @@ DEVICE_SWITCH2_ID = 46
 DEVICE_GARAGE_DOOR_ID = 47
 DEVICE_LOCK_ID = 10
 DEVICE_THERMOSTAT_ID = 11
+DEVICE_THERMOSTAT2_ID = 18
 DEVICE_CURTAIN_ID = 12
 DEVICE_SCENE_CONTROLLER_ID = 13
 DEVICE_LIGHT_SENSOR_ID = 14
@@ -562,6 +563,31 @@ RESPONSE_SDATA = {
             "fanmode": "Off",
             "hvacstate": "Off",
             "setpoint": 8,
+            "temperature": 9,
+            "watts": 23,
+            "comment": "",
+        },
+        {
+            "name": "Thermostat 2",
+            "altid": "5",
+            "id": DEVICE_THERMOSTAT2_ID,
+            "category": CATEGORY_THERMOSTAT,
+            "subcategory": 0,
+            "room": 0,
+            "parent": 1,
+            "configured": "1",
+            "commFailure": "0",
+            "armedtripped": "1",
+            "lasttrip": "1561049427",
+            "tripped": "1",
+            "armed": "0",
+            "status": "0",
+            "state": -1,
+            "mode": "Off",
+            "fanmode": "Off",
+            "hvacstate": "Off",
+            "heatsp": 7,
+            "coolsp": 17,
             "temperature": 9,
             "watts": 23,
             "comment": "",
@@ -810,6 +836,14 @@ RESPONSE_STATUS: dict = {
         },
         {
             "id": DEVICE_THERMOSTAT_ID,
+            "states": [],
+            "Jobs": [],
+            "PendingJobs": 0,
+            "tooltip": {"display": 0},
+            "status": -1,
+        },
+        {
+            "id": DEVICE_THERMOSTAT2_ID,
             "states": [],
             "Jobs": [],
             "PendingJobs": 0,
