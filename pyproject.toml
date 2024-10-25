@@ -3,14 +3,11 @@ name = "pyvera"
 version = "0.3.15"
 description = "Python API for talking to Veracontrollers"
 
-license = "GPL2"
+license = "GPL-2.0-only"
 
 authors = [
     "James Cole",
     "Greg Dowling <mail@gregdowling.com>"
-]
-classifiers = [
-    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
 ]
 
 readme = 'README.md'
