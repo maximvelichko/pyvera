@@ -1,13 +1,14 @@
 [tool.poetry]
 name = "pyvera"
-version = "0.3.15"
+version = "0.3.16"
 description = "Python API for talking to Veracontrollers"
 
 license = "GPL2"
 
 authors = [
     "James Cole",
-    "Greg Dowling <mail@gregdowling.com>"
+    "Greg Dowling <mail@gregdowling.com>",
+    "Max Velitchko"
 ]
 classifiers = [
     "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
