@@ -341,6 +341,98 @@ def test_thermostat(vera_controller_data: VeraControllerData) -> None:
     assert device2.get_value("coolsp") == "60"
 
 
+def test_thermostat_heat_cool_setpoints(
+    vera_controller_data: VeraControllerData,
+) -> None:
+    """Test reading and writing the separate heat and cool setpoints."""
+    controller = vera_controller_data.controller
+    device = cast(VeraThermostat, controller.get_device_by_id(DEVICE_THERMOSTAT2_ID))
+
+    # Values come from the per-service state variables, not the summary data.
+    assert device.get_heat_setpoint() == 19.5
+    assert device.get_cool_setpoint() == 24.0
+    assert device.get_heat_setpoint(refresh=True) == 19.5
+    assert device.get_cool_setpoint(refresh=True) == 24.0
+
+    device.set_heat_setpoint(20.5)
+    assert device.get_heat_setpoint() == 20.5
+    assert device.get_heat_setpoint(refresh=True) == 20.5
+    assert device.get_cool_setpoint() == 24.0
+
+    device.set_cool_setpoint(25)
+    assert device.get_cool_setpoint() == 25.0
+    assert device.get_cool_setpoint(refresh=True) == 25.0
+    assert device.get_heat_setpoint() == 20.5
+
+    # The generic setpoint is a separate variable and is left alone.
+    assert (
+        device.get_service_value(device.thermostat_setpoint, "CurrentSetpoint")
+        == "21.75"
+    )
+
+
+def test_thermostat_without_setpoint_variables(
+    vera_controller_data: VeraControllerData,
+) -> None:
+    """Test a thermostat that does not report heat/cool setpoint variables."""
+    controller = vera_controller_data.controller
+    device = cast(VeraThermostat, controller.get_device_by_id(DEVICE_THERMOSTAT_ID))
+
+    assert device.get_heat_setpoint(refresh=True) is None
+    assert device.get_cool_setpoint(refresh=True) is None
+
+    # A cached value is created when one is set.
+    device.set_heat_setpoint(18)
+    assert device.get_heat_setpoint() == 18.0
+
+
+def test_thermostat_energy_mode(vera_controller_data: VeraControllerData) -> None:
+    """Test reading and writing the energy mode."""
+    controller = vera_controller_data.controller
+    device = cast(VeraThermostat, controller.get_device_by_id(DEVICE_THERMOSTAT2_ID))
+
+    assert device.get_energy_mode() == "Normal"
+    assert device.get_energy_mode(refresh=True) == "Normal"
+
+    device.set_energy_mode("EnergySavingsMode")
+    assert device.get_energy_mode() == "EnergySavingsMode"
+    assert device.get_energy_mode(refresh=True) == "EnergySavingsMode"
+    assert (
+        device.get_service_value(
+            device.thermostat_operating_service[0], "EnergyModeTarget"
+        )
+        == "EnergySavingsMode"
+    )
+
+    device.set_energy_mode("Normal")
+    assert device.get_energy_mode(refresh=True) == "Normal"
+
+    # The heat/cool setpoints are separate variables and are left alone.
+    assert device.get_heat_setpoint() == 19.5
+
+
+def test_thermostat_without_energy_mode(
+    vera_controller_data: VeraControllerData,
+) -> None:
+    """Test a thermostat that does not report an energy mode."""
+    controller = vera_controller_data.controller
+    device = cast(VeraThermostat, controller.get_device_by_id(DEVICE_THERMOSTAT_ID))
+
+    assert device.get_energy_mode(refresh=True) is None
+
+
+def test_refresh_states_keeps_cache_on_unexpected_response(
+    vera_controller_data: VeraControllerData,
+) -> None:
+    """Test refresh_states leaves cached states alone if the device is missing."""
+    controller = vera_controller_data.controller
+    device = cast(VeraThermostat, controller.get_device_by_id(DEVICE_THERMOSTAT2_ID))
+    device.device_id = 9999  # Not known to the fake Vera.
+
+    device.refresh_states()
+    assert device.get_heat_setpoint() == 19.5
+
+
 def test_curtain(vera_controller_data: VeraControllerData) -> None:
     """Test function."""
     controller = vera_controller_data.controller

@@ -680,6 +680,47 @@ class VeraDevice:
                 return item.get("value")
         return None
 
+    def get_service_value(self, service_id: str, variable: str) -> Any:
+        """Get a cached state variable, matched on both service and name.
+
+        Unlike get_complex_value, this distinguishes variables that share a
+        name across services (e.g. CurrentSetpoint on TemperatureSetpoint1,
+        TemperatureSetpoint1_Heat and TemperatureSetpoint1_Cool).
+        """
+        for item in self.json_state.get("states", []):
+            if item.get("service") == service_id and item.get("variable") == variable:
+                return item.get("value")
+        return None
+
+    def set_cache_service_value(
+        self, service_id: str, variable: str, value: Any
+    ) -> None:
+        """Set a cached state variable, matched on both service and name.
+
+        This does not change the physical device.
+        """
+        states = self.json_state.setdefault("states", [])
+        for item in states:
+            if item.get("service") == service_id and item.get("variable") == variable:
+                item["value"] = str(value)
+                return
+        states.append(
+            {"service": service_id, "variable": variable, "value": str(value)}
+        )
+
+    def refresh_states(self) -> None:
+        """Refresh all of this device's state variables from the Vera.
+
+        The subscription service only updates the summary (dev_info) data, so
+        state variables that are not mirrored there must be refreshed
+        explicitly.
+        """
+        j = self.vera_request(id="status").json()
+        device_status = j.get(f"Device_Num_{self.device_id}") or {}
+        states = device_status.get("states")
+        if isinstance(states, list):
+            self.json_state["states"] = states
+
     def set_alerts(self, json_alerts: List[dict]) -> None:
         """Convert JSON alert data to VeraAlerts."""
         self.alerts = [VeraAlert(json_alert, self) for json_alert in json_alerts]
@@ -1342,6 +1383,63 @@ class VeraThermostat(VeraDevice):
     def fan_cycle(self) -> None:
         """Set fan to cycle."""
         self.set_fan_mode("PeriodicOn")
+
+    def _get_setpoint(self, service_id: str, refresh: bool) -> Optional[float]:
+        if refresh:
+            self.refresh_states()
+        try:
+            return float(self.get_service_value(service_id, "CurrentSetpoint"))
+        except (TypeError, ValueError):
+            return None
+
+    def _set_setpoint(self, service_id: str, temp: float) -> None:
+        self.set_service_value(
+            service_id, "CurrentSetpoint", "NewCurrentSetpoint", temp
+        )
+        self.set_cache_service_value(service_id, "CurrentSetpoint", temp)
+
+    def get_heat_setpoint(self, refresh: bool = False) -> Optional[float]:
+        """Get the heating setpoint (TemperatureSetpoint1_Heat).
+
+        Read from the device's state variables rather than the summary data,
+        which some firmware populates from the single generic setpoint.
+        """
+        return self._get_setpoint(self.thermostat_heat_setpoint, refresh)
+
+    def get_cool_setpoint(self, refresh: bool = False) -> Optional[float]:
+        """Get the cooling setpoint (TemperatureSetpoint1_Cool)."""
+        return self._get_setpoint(self.thermostat_cool_setpoint, refresh)
+
+    def set_heat_setpoint(self, temp: float) -> None:
+        """Set the heating setpoint (TemperatureSetpoint1_Heat)."""
+        self._set_setpoint(self.thermostat_heat_setpoint, temp)
+
+    def set_cool_setpoint(self, temp: float) -> None:
+        """Set the cooling setpoint (TemperatureSetpoint1_Cool)."""
+        self._set_setpoint(self.thermostat_cool_setpoint, temp)
+
+    def get_energy_mode(self, refresh: bool = False) -> Optional[str]:
+        """Get the energy mode (EnergyModeStatus).
+
+        Typically "Normal" or "EnergySavingsMode". While in energy savings
+        mode, get_hvac_mode reports the economy variant of the mode, e.g.
+        "EconomyHeatOn".
+        """
+        if refresh:
+            self.refresh_states()
+        return cast(
+            Optional[str],
+            self.get_service_value(
+                self.thermostat_operating_service[0], "EnergyModeStatus"
+            ),
+        )
+
+    def set_energy_mode(self, mode: str) -> None:
+        """Set the energy mode, e.g. "Normal" or "EnergySavingsMode"."""
+        service_id = self.thermostat_operating_service[0]
+        self.set_service_value(service_id, "EnergyModeTarget", "NewModeTarget", mode)
+        self.set_cache_service_value(service_id, "EnergyModeTarget", mode)
+        self.set_cache_service_value(service_id, "EnergyModeStatus", mode)
 
     def _has_double_setpoints(self) -> bool:
         """Determines if a thermostate has two setpoints"""
